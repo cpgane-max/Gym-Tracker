@@ -445,12 +445,25 @@
     </div>
 
     <div class="chat-wrap">
-      <div class="chat-messages" id="chat">
-        <div class="bubble bot">Hey! What did you do at the gym today? Just describe it naturally — e.g. <em>"45 min weights, chest and shoulders"</em> or <em>"30 min run on the treadmill"</em>.</div>
-      </div>
-      <div class="chat-input-row">
-        <input type="text" id="user-input" placeholder="Describe your session and hit Enter..." />
-        <button id="send-btn" onclick="sendMessage()">LOG →</button>
+      <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Activity</label>
+            <input type="text" id="f-activity" placeholder="e.g. Weights – chest, Running" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+          </div>
+          <div>
+            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Duration (minutes)</label>
+            <input type="number" id="f-duration" placeholder="e.g. 45" min="1" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+          </div>
+        </div>
+        <div>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Comments</label>
+          <input type="text" id="f-comments" placeholder="Any notes about the session..." style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button id="send-btn" onclick="logSession()" style="background:var(--accent);color:#0e0f0e;border:none;border-radius:var(--radius);padding:0.7rem 1.5rem;font-size:13px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;">LOG SESSION →</button>
+          <span id="log-status" style="font-size:13px;"></span>
+        </div>
       </div>
     </div>
 
@@ -478,12 +491,9 @@
 
   <script>
     const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwniwZzPNkyrN06U-t4O11tXlomuY2WPgxlfmypAV1qaGsR3pitDCNBuCzwdo1Xjc1j/exec";
-    const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-    const ANTHROPIC_API_KEY = "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"; // ← paste your key from console.anthropic.com
     const STORAGE_KEY = "gym_sessions_v1";
 
     let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    let isLoading = false;
 
     function saveSessions() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
@@ -497,16 +507,6 @@
 
     function getCurrentWeek() {
       return getWeekNumber(new Date().toISOString().split("T")[0]);
-    }
-
-    function addBubble(text, type) {
-      const chat = document.getElementById("chat");
-      const b = document.createElement("div");
-      b.className = "bubble " + (type || "bot");
-      b.innerHTML = text;
-      chat.appendChild(b);
-      chat.scrollTop = chat.scrollHeight;
-      return b;
     }
 
     async function syncToSheets(session) {
@@ -529,71 +529,44 @@
       }
     }
 
-    async function sendMessage() {
-      if (isLoading) return;
-      const input = document.getElementById("user-input");
-      const text = input.value.trim();
-      if (!text) return;
-      input.value = "";
-      isLoading = true;
-      document.getElementById("send-btn").disabled = true;
+    async function logSession() {
+      const activity = document.getElementById("f-activity").value.trim();
+      const duration = parseInt(document.getElementById("f-duration").value);
+      const comments = document.getElementById("f-comments").value.trim();
+      const status = document.getElementById("log-status");
 
-      addBubble(text, "user");
-      const thinking = addBubble("Parsing your session...", "thinking");
+      if (!activity) { status.style.color = "var(--danger)"; status.textContent = "Please enter an activity."; return; }
+      if (!duration || duration < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a valid duration."; return; }
+
+      const btn = document.getElementById("send-btn");
+      btn.disabled = true;
+      status.style.color = "var(--muted)";
+      status.textContent = "Syncing...";
 
       const dateStr = new Date().toISOString().split("T")[0];
+      const session = {
+        id: Date.now(),
+        date: dateStr,
+        week: getWeekNumber(dateStr),
+        activity,
+        duration,
+        comments: comments || "—"
+      };
 
-      try {
-        const resp = await fetch(ANTHROPIC_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-access": "true"
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 300,
-            messages: [{
-              role: "user",
-              content: `Extract gym session info from this message and respond ONLY with a JSON object, no markdown, no explanation. Keys: activity (short label e.g. "Weights – chest", "Running", "Yoga"), duration_minutes (integer, estimate 30 if unclear), comments (brief note, max 80 chars). Message: "${text}". Today's date: ${dateStr}.`
-            }]
-          })
-        });
+      sessions.unshift(session);
+      saveSessions();
+      renderTable();
+      updateStats();
 
-        const data = await resp.json();
-        const raw = data.content.map(i => i.text || "").join("").replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(raw);
+      const synced = await syncToSheets(session);
+      status.style.color = synced ? "var(--accent)" : "var(--danger)";
+      status.textContent = synced ? "✓ Logged & synced to Google Sheets!" : "Saved locally — couldn't reach Google Sheets.";
 
-        const session = {
-          id: Date.now(),
-          date: dateStr,
-          week: getWeekNumber(dateStr),
-          activity: parsed.activity || "Gym session",
-          duration: parseInt(parsed.duration_minutes) || 30,
-          comments: parsed.comments || text
-        };
-
-        sessions.unshift(session);
-        saveSessions();
-        renderTable();
-        updateStats();
-
-        thinking.textContent = "Syncing to Google Sheets...";
-        const synced = await syncToSheets(session);
-        thinking.className = "bubble " + (synced ? "success" : "error");
-        thinking.textContent = synced
-          ? `✓ Logged & synced — ${session.activity}, ${session.duration} min. Nice work!`
-          : `Saved locally, but couldn't reach Google Sheets. Check your network.`;
-
-      } catch (e) {
-        thinking.className = "bubble error";
-        thinking.textContent = "Something went wrong — please try again.";
-      }
-
-      isLoading = false;
-      document.getElementById("send-btn").disabled = false;
+      document.getElementById("f-activity").value = "";
+      document.getElementById("f-duration").value = "";
+      document.getElementById("f-comments").value = "";
+      btn.disabled = false;
+      setTimeout(() => { status.textContent = ""; }, 4000);
     }
 
     function deleteSession(id) {
@@ -627,10 +600,6 @@
       document.getElementById("stat-mins").textContent = sessions.reduce((a, s) => a + s.duration, 0);
       document.getElementById("stat-week").textContent = sessions.filter(s => s.week === getCurrentWeek()).length;
     }
-
-    document.getElementById("user-input").addEventListener("keydown", e => {
-      if (e.key === "Enter") sendMessage();
-    });
 
     renderTable();
     updateStats();
