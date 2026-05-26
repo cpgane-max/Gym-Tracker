@@ -179,11 +179,11 @@
         <span class="chevron">▼</span>
       </button>
       <div id="cal-body" style="display:none;">
-        <div class="cal-header" style="border-top:0.5px solid var(--border);">
+        <div style="border-top:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;">
           <button class="cal-nav" onclick="calPrev()">◀</button>
-          <div style="display:flex;align-items:center;gap:10px;">
+          <div style="display:flex;align-items:center;gap:12px;">
             <span class="cal-title" id="cal-title"></span>
-            <button class="cal-nav" onclick="calGoToday()" style="font-size:10px;padding:3px 9px;font-family:'DM Mono',monospace;letter-spacing:0.05em;color:var(--accent);border-color:var(--accent-dark);">TODAY</button>
+            <button onclick="calGoToday()" style="background:var(--accent-dim);border:0.5px solid var(--accent-dark);border-radius:6px;color:var(--accent);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;padding:4px 10px;cursor:pointer;">TODAY</button>
           </div>
           <button class="cal-nav" onclick="calNext()">▶</button>
         </div>
@@ -398,6 +398,7 @@
     function renderCalendar() {
       const workouts = getWorkoutsByDate();
       const today = new Date();
+      const todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
       const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
       document.getElementById("cal-title").textContent = monthNames[calMonth] + " " + calYear;
 
@@ -408,6 +409,11 @@
       const dowMap = {3:0,4:1,5:2,6:3,0:4,1:5,2:6};
       const startPad = dowMap[firstDow];
 
+      // Helper: local YYYY-MM-DD from a Date object (avoids UTC shift for Australian timezone)
+      function localDateStr(d) {
+        return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+      }
+
       let html = "";
       for (let i = 0; i < startPad; i++) {
         const d = new Date(calYear, calMonth, 1 - (startPad - i));
@@ -416,8 +422,8 @@
 
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const dateObj = new Date(calYear, calMonth, d);
-        const dateStr = dateObj.toISOString().split("T")[0];
-        const isToday = (dateObj.toDateString() === today.toDateString());
+        const dateStr = localDateStr(dateObj);
+        const isToday = (dateStr === todayStr);
         const hasW = !!(workouts[dateStr] && workouts[dateStr].length);
         const classes = ["cal-day", isToday ? "today" : "", hasW ? "has-workout" : ""].filter(Boolean).join(" ");
         const dot = hasW ? `<span class="cal-dot"></span>` : "";
