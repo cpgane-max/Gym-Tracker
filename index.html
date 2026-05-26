@@ -428,7 +428,7 @@
           <span class="dot"></span>
           Syncing to Google Sheets
         </div>
-        <a href="https://docs.google.com/spreadsheets/d/13qSWvcTERnvuQZswVTZAkos5N8KSZgEPh838_q9tceQ/edit?gid=0#gid=0" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:var(--muted);text-decoration:none;border-bottom:0.5px solid var(--border2);padding-bottom:1px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">View Google Sheet →</a>
+        <a href="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:var(--muted);text-decoration:none;border-bottom:0.5px solid var(--border2);padding-bottom:1px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">View Google Sheet →</a>
       </div>
     </header>
 
@@ -449,6 +449,7 @@
 
     <div class="chat-wrap">
       <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
             <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Date</label>
@@ -459,24 +460,27 @@
             <input type="number" id="f-week" min="1" max="53" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
           </div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-          <div>
-            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Activity</label>
-            <input type="text" id="f-activity" placeholder="e.g. Weights – chest, Running" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
-          </div>
-          <div>
-            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Duration (minutes)</label>
-            <input type="number" id="f-duration" placeholder="e.g. 45" min="1" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+
+        <div style="border-top:0.5px solid var(--border);padding-top:12px;">
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Activities</label>
+          <div id="activity-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 100px 32px;gap:8px;align-items:center;">
+            <input type="text" id="f-activity" placeholder="Activity e.g. Weights – chest" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+            <input type="number" id="f-duration" placeholder="Min" min="1" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+            <button onclick="addActivity()" title="Add activity" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--accent);font-size:20px;cursor:pointer;height:38px;width:32px;display:flex;align-items:center;justify-content:center;padding:0;">+</button>
           </div>
         </div>
+
         <div>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Comments</label>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Comments (applies to all activities)</label>
           <input type="text" id="f-comments" placeholder="Any notes about the session..." style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
         </div>
+
         <div style="display:flex;align-items:center;gap:12px;">
           <button id="send-btn" onclick="logSession()" style="background:var(--accent);color:#0e0f0e;border:none;border-radius:var(--radius);padding:0.7rem 1.5rem;font-size:13px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;">LOG SESSION →</button>
           <span id="log-status" style="font-size:13px;"></span>
         </div>
+
       </div>
     </div>
 
@@ -546,46 +550,94 @@
       }
     }
 
+    let stagedActivities = [];
+
+    function addActivity() {
+      const activity = document.getElementById("f-activity").value.trim();
+      const duration = parseInt(document.getElementById("f-duration").value);
+      const status = document.getElementById("log-status");
+
+      if (!activity) { status.style.color = "var(--danger)"; status.textContent = "Please enter an activity."; return; }
+      if (!duration || duration < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a valid duration."; return; }
+
+      stagedActivities.push({ activity, duration });
+      document.getElementById("f-activity").value = "";
+      document.getElementById("f-duration").value = "";
+      document.getElementById("f-activity").focus();
+      status.textContent = "";
+      renderStaged();
+    }
+
+    function removeStaged(index) {
+      stagedActivities.splice(index, 1);
+      renderStaged();
+    }
+
+    function renderStaged() {
+      const list = document.getElementById("activity-list");
+      if (!stagedActivities.length) { list.innerHTML = ""; return; }
+      list.innerHTML = stagedActivities.map((a, i) => `
+        <div style="display:grid;grid-template-columns:1fr 100px 32px;gap:8px;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px 10px;">
+          <span style="font-size:13px;font-weight:500;">${a.activity}</span>
+          <span style="font-size:13px;color:var(--muted);">${a.duration} min</span>
+          <button onclick="removeStaged(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0;opacity:0.7;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">×</button>
+        </div>
+      `).join("");
+    }
+
     async function logSession() {
       const dateVal = document.getElementById("f-date").value;
       const weekVal = parseInt(document.getElementById("f-week").value);
-      const activity = document.getElementById("f-activity").value.trim();
-      const duration = parseInt(document.getElementById("f-duration").value);
       const comments = document.getElementById("f-comments").value.trim();
       const status = document.getElementById("log-status");
 
       if (!dateVal) { status.style.color = "var(--danger)"; status.textContent = "Please select a date."; return; }
       if (!weekVal || weekVal < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a week number."; return; }
-      if (!activity) { status.style.color = "var(--danger)"; status.textContent = "Please enter an activity."; return; }
-      if (!duration || duration < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a valid duration."; return; }
+
+      // Include any unsaved activity still in the input fields
+      const pendingActivity = document.getElementById("f-activity").value.trim();
+      const pendingDuration = parseInt(document.getElementById("f-duration").value);
+      if (pendingActivity && pendingDuration > 0) {
+        stagedActivities.push({ activity: pendingActivity, duration: pendingDuration });
+        document.getElementById("f-activity").value = "";
+        document.getElementById("f-duration").value = "";
+        renderStaged();
+      }
+
+      if (!stagedActivities.length) { status.style.color = "var(--danger)"; status.textContent = "Please add at least one activity."; return; }
 
       const btn = document.getElementById("send-btn");
       btn.disabled = true;
       status.style.color = "var(--muted)";
-      status.textContent = "Syncing...";
+      status.textContent = `Syncing ${stagedActivities.length} activit${stagedActivities.length > 1 ? "ies" : "y"}...`;
 
-      const session = {
-        id: Date.now(),
-        date: dateVal,
-        week: weekVal,
-        activity,
-        duration,
-        comments: comments || "—"
-      };
+      let allSynced = true;
+      for (const a of stagedActivities) {
+        const session = {
+          id: Date.now() + Math.random(),
+          date: dateVal,
+          week: weekVal,
+          activity: a.activity,
+          duration: a.duration,
+          comments: comments || "—"
+        };
+        sessions.unshift(session);
+        const synced = await syncToSheets(session);
+        if (!synced) allSynced = false;
+      }
 
-      sessions.unshift(session);
       saveSessions();
       renderTable();
       updateStats();
 
-      const synced = await syncToSheets(session);
-      status.style.color = synced ? "var(--accent)" : "var(--danger)";
-      status.textContent = synced ? "✓ Logged & synced to Google Sheets!" : "Saved locally — couldn't reach Google Sheets.";
+      status.style.color = allSynced ? "var(--accent)" : "var(--danger)";
+      status.textContent = allSynced
+        ? `✓ ${stagedActivities.length} activit${stagedActivities.length > 1 ? "ies" : "y"} logged & synced!`
+        : "Saved locally — couldn't reach Google Sheets.";
 
-      document.getElementById("f-activity").value = "";
-      document.getElementById("f-duration").value = "";
+      stagedActivities = [];
+      renderStaged();
       document.getElementById("f-comments").value = "";
-      // Reset date and week to today
       const today = new Date().toISOString().split("T")[0];
       document.getElementById("f-date").value = today;
       document.getElementById("f-week").value = getWeekNumber(today);
@@ -646,6 +698,10 @@
     document.getElementById("f-date").addEventListener("change", function() {
       if (this.value) document.getElementById("f-week").value = getWeekNumber(this.value);
     });
+
+    // Press Enter in activity/duration fields to add to staging
+    document.getElementById("f-activity").addEventListener("keydown", e => { if (e.key === "Enter") addActivity(); });
+    document.getElementById("f-duration").addEventListener("keydown", e => { if (e.key === "Enter") addActivity(); });
   </script>
 
   <script>
