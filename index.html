@@ -479,6 +479,7 @@
   <script>
     const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwniwZzPNkyrN06U-t4O11tXlomuY2WPgxlfmypAV1qaGsR3pitDCNBuCzwdo1Xjc1j/exec";
     const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+    const ANTHROPIC_API_KEY = "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"; // ← paste your key from console.anthropic.com
     const STORAGE_KEY = "gym_sessions_v1";
 
     let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -545,7 +546,12 @@
       try {
         const resp = await fetch(ANTHROPIC_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true"
+          },
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
             max_tokens: 300,
