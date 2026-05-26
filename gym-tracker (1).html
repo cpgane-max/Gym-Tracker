@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gym Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0f0e;
+      --surface: #161717;
+      --surface2: #1e1f1e;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0f0ee;
+      --muted: #888986;
+      --accent: #c8f06a;
+      --accent-dim: rgba(200,240,106,0.12);
+      --accent-dark: #8aaa3a;
+      --danger: #f06a6a;
+      --danger-dim: rgba(240,106,106,0.1);
+      --radius: 10px;
+      --radius-lg: 16px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    #lock-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .lock-card {
+      background: var(--surface);
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 340px;
+      text-align: center;
+    }
+
+    .lock-icon {
+      font-size: 32px;
+      margin-bottom: 1rem;
+    }
+
+    .lock-card h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .lock-card p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .lock-card input {
+      width: 100%;
+      background: var(--surface2);
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 15px;
+      font-family: 'DM Mono', monospace;
+      color: var(--text);
+      text-align: center;
+      letter-spacing: 0.1em;
+      outline: none;
+      margin-bottom: 0.75rem;
+    }
+
+    .lock-card input:focus {
+      border-color: var(--accent-dark);
+    }
+
+    .lock-card button {
+      width: 100%;
+      background: var(--accent);
+      color: #0e0f0e;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .lock-card button:hover { opacity: 0.85; }
+
+    .lock-error {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 0.6rem;
+      min-height: 16px;
+    }
+
+    .container {
+      max-width: 740px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .logo-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .logo h1 {
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .sheets-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 0.5px solid var(--accent-dark);
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .sheets-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 2rem;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-val {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .chat-wrap {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+
+    .chat-messages {
+      padding: 1.25rem;
+      min-height: 90px;
+      max-height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bubble {
+      padding: 0.7rem 1rem;
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 88%;
+    }
+
+    .bubble.bot {
+      background: var(--surface2);
+      border: 0.5px solid var(--border);
+      color: var(--text);
+      align-self: flex-start;
+    }
+
+    .bubble.user {
+      background: var(--accent-dim);
+      border: 0.5px solid var(--accent-dark);
+      color: var(--accent);
+      align-self: flex-end;
+      text-align: right;
+    }
+
+    .bubble.thinking {
+      background: transparent;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 13px;
+      align-self: flex-start;
+      padding-left: 0;
+    }
+
+    .bubble.success {
+      background: var(--accent-dim);
+      border: 0.5px solid var(--accent-dark);
+      color: var(--accent);
+      align-self: flex-start;
+    }
+
+    .bubble.error {
+      background: var(--danger-dim);
+      border: 0.5px solid var(--danger);
+      color: var(--danger);
+      align-self: flex-start;
+    }
+
+    .chat-input-row {
+      display: flex;
+      border-top: 0.5px solid var(--border);
+    }
+
+    .chat-input-row input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 1rem 1.25rem;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+    }
+
+    .chat-input-row input::placeholder { color: var(--muted); }
+
+    .chat-input-row button {
+      background: var(--accent);
+      color: #0e0f0e;
+      border: none;
+      padding: 0 1.5rem;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .chat-input-row button:hover { opacity: 0.85; }
+    .chat-input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .table-wrap {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 0.5px solid var(--border);
+      background: var(--surface2);
+    }
+
+    td {
+      padding: 11px 14px;
+      font-size: 13px;
+      border-bottom: 0.5px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    .week-badge {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 0.5px solid var(--accent-dark);
+    }
+
+    .muted-cell { color: var(--muted); }
+
+    .del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .del-btn:hover { color: var(--danger); background: var(--danger-dim); }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .empty-state span {
+      display: block;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 520px) {
+      .stats-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .stat-val { font-size: 22px; }
+      header { flex-direction: column; align-items: flex-start; gap: 12px; }
+      th:nth-child(5), td:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="lock-screen">
+    <div class="lock-card">
+      <div class="lock-icon">🏋️</div>
+      <h2>Gym Tracker</h2>
+      <p>Enter the password to continue</p>
+      <input type="password" id="pw-input" placeholder="Password" />
+      <button onclick="checkPassword()">Unlock →</button>
+      <div class="lock-error" id="pw-error"></div>
+    </div>
+  </div>
+
+  <div class="container" id="app" style="display:none">
+
+    <header>
+      <div class="logo">
+        <span class="logo-eyebrow">Training log</span>
+        <h1>Gym Tracker</h1>
+      </div>
+      <div class="sheets-pill">
+        <span class="dot"></span>
+        Syncing to Google Sheets
+      </div>
+    </header>
+
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-label">Sessions</div>
+        <div class="stat-val" id="stat-count">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Minutes</div>
+        <div class="stat-val" id="stat-mins">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">This week</div>
+        <div class="stat-val" id="stat-week">0</div>
+      </div>
+    </div>
+
+    <div class="chat-wrap">
+      <div class="chat-messages" id="chat">
+        <div class="bubble bot">Hey! What did you do at the gym today? Just describe it naturally — e.g. <em>"45 min weights, chest and shoulders"</em> or <em>"30 min run on the treadmill"</em>.</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="user-input" placeholder="Describe your session and hit Enter..." />
+        <button id="send-btn" onclick="sendMessage()">LOG →</button>
+      </div>
+    </div>
+
+    <div class="history-header">
+      <span class="section-label">Session history</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:56px">Week</th>
+            <th style="width:96px">Date</th>
+            <th style="width:130px">Activity</th>
+            <th style="width:80px">Duration</th>
+            <th>Comments</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="session-tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwniwZzPNkyrN06U-t4O11tXlomuY2WPgxlfmypAV1qaGsR3pitDCNBuCzwdo1Xjc1j/exec";
+    const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+    const STORAGE_KEY = "gym_sessions_v1";
+
+    let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    let isLoading = false;
+
+    function saveSessions() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }
+
+    function getWeekNumber(dateStr) {
+      const d = new Date(dateStr);
+      const jan1 = new Date(d.getFullYear(), 0, 1);
+      return Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+    }
+
+    function getCurrentWeek() {
+      return getWeekNumber(new Date().toISOString().split("T")[0]);
+    }
+
+    function addBubble(text, type) {
+      const chat = document.getElementById("chat");
+      const b = document.createElement("div");
+      b.className = "bubble " + (type || "bot");
+      b.innerHTML = text;
+      chat.appendChild(b);
+      chat.scrollTop = chat.scrollHeight;
+      return b;
+    }
+
+    async function syncToSheets(session) {
+      try {
+        await fetch(SHEETS_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            week: session.week,
+            date: session.date,
+            activity: session.activity,
+            duration: session.duration,
+            comments: session.comments
+          })
+        });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function sendMessage() {
+      if (isLoading) return;
+      const input = document.getElementById("user-input");
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      isLoading = true;
+      document.getElementById("send-btn").disabled = true;
+
+      addBubble(text, "user");
+      const thinking = addBubble("Parsing your session...", "thinking");
+
+      const dateStr = new Date().toISOString().split("T")[0];
+
+      try {
+        const resp = await fetch(ANTHROPIC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 300,
+            messages: [{
+              role: "user",
+              content: `Extract gym session info from this message and respond ONLY with a JSON object, no markdown, no explanation. Keys: activity (short label e.g. "Weights – chest", "Running", "Yoga"), duration_minutes (integer, estimate 30 if unclear), comments (brief note, max 80 chars). Message: "${text}". Today's date: ${dateStr}.`
+            }]
+          })
+        });
+
+        const data = await resp.json();
+        const raw = data.content.map(i => i.text || "").join("").replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(raw);
+
+        const session = {
+          id: Date.now(),
+          date: dateStr,
+          week: getWeekNumber(dateStr),
+          activity: parsed.activity || "Gym session",
+          duration: parseInt(parsed.duration_minutes) || 30,
+          comments: parsed.comments || text
+        };
+
+        sessions.unshift(session);
+        saveSessions();
+        renderTable();
+        updateStats();
+
+        thinking.textContent = "Syncing to Google Sheets...";
+        const synced = await syncToSheets(session);
+        thinking.className = "bubble " + (synced ? "success" : "error");
+        thinking.textContent = synced
+          ? `✓ Logged & synced — ${session.activity}, ${session.duration} min. Nice work!`
+          : `Saved locally, but couldn't reach Google Sheets. Check your network.`;
+
+      } catch (e) {
+        thinking.className = "bubble error";
+        thinking.textContent = "Something went wrong — please try again.";
+      }
+
+      isLoading = false;
+      document.getElementById("send-btn").disabled = false;
+    }
+
+    function deleteSession(id) {
+      if (!confirm("Remove this session?")) return;
+      sessions = sessions.filter(s => s.id !== id);
+      saveSessions();
+      renderTable();
+      updateStats();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("session-tbody");
+      if (!sessions.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span>🏋️</span>No sessions yet — log your first one above!</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = sessions.map(s => `
+        <tr>
+          <td><span class="week-badge">W${s.week}</span></td>
+          <td class="muted-cell">${s.date}</td>
+          <td style="font-weight:500">${s.activity}</td>
+          <td class="muted-cell">${s.duration} min</td>
+          <td class="muted-cell">${s.comments}</td>
+          <td><button class="del-btn" onclick="deleteSession(${s.id})" title="Delete">×</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function updateStats() {
+      document.getElementById("stat-count").textContent = sessions.length;
+      document.getElementById("stat-mins").textContent = sessions.reduce((a, s) => a + s.duration, 0);
+      document.getElementById("stat-week").textContent = sessions.filter(s => s.week === getCurrentWeek()).length;
+    }
+
+    document.getElementById("user-input").addEventListener("keydown", e => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    renderTable();
+    updateStats();
+  </script>
+
+  <script>
+    // -------------------------------------------------------
+    // CHANGE THE PASSWORD BELOW
+    const APP_PASSWORD = "gymtime";
+    // -------------------------------------------------------
+
+    function checkPassword() {
+      const val = document.getElementById("pw-input").value;
+      if (val === APP_PASSWORD) {
+        sessionStorage.setItem("gym_unlocked", "1");
+        document.getElementById("lock-screen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+      } else {
+        const err = document.getElementById("pw-error");
+        err.textContent = "Incorrect password — try again.";
+        document.getElementById("pw-input").value = "";
+        document.getElementById("pw-input").focus();
+        setTimeout(() => { err.textContent = ""; }, 3000);
+      }
+    }
+
+    document.getElementById("pw-input").addEventListener("keydown", e => {
+      if (e.key === "Enter") checkPassword();
+    });
+
+    if (sessionStorage.getItem("gym_unlocked") === "1") {
+      document.getElementById("lock-screen").style.display = "none";
+      document.getElementById("app").style.display = "block";
+    }
+  </script>
+</body>
+</html>
