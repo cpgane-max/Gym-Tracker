@@ -311,7 +311,7 @@
 
       let allSessions = [];
       try {
-        const resp = await fetch(SHEETS_URL + "?action=getSessions");
+        const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
         const data = await resp.json();
         if (data.success) allSessions = data.sessions;
       } catch(e) {
@@ -348,7 +348,7 @@
       const isOpen = body.style.display !== "none";
       body.style.display = isOpen ? "none" : "block";
       toggle.classList.toggle("open", !isOpen);
-      if (!isOpen) loadCalendarData();
+      if (!isOpen) { sheetWorkoutMap = null; loadCalendarData(); }
     }
 
     async function loadCalendarData() {
@@ -356,7 +356,7 @@
       document.getElementById("cal-status").textContent = "";
       document.getElementById("cal-status").style.color = "var(--muted)";
       try {
-        const resp = await fetch(SHEETS_URL + "?action=getSessions");
+        const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
         const data = await resp.json();
         sheetWorkoutMap = {};
         if (data.success) {
