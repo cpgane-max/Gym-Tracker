@@ -511,17 +511,16 @@
 
     async function syncToSheets(session) {
       try {
-        await fetch(SHEETS_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            week: session.week,
-            date: session.date,
-            activity: session.activity,
-            duration: session.duration,
-            comments: session.comments
-          })
+        const params = new URLSearchParams({
+          week: session.week,
+          date: session.date,
+          activity: session.activity,
+          duration: session.duration,
+          comments: session.comments
+        });
+        await fetch(SHEETS_URL + "?" + params.toString(), {
+          method: "GET",
+          mode: "no-cors"
         });
         return true;
       } catch (e) {
