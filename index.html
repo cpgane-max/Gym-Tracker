@@ -300,15 +300,31 @@
       return "other";
     }
 
-    function updateSummary() {
+    async function updateSummary() {
+      // Show loading state
+      ["sum-total","sum-pt","sum-cardio","sum-weights"].forEach(id => document.getElementById(id).textContent = "…");
+      ["sum-mins-total","sum-pt-mins","sum-cardio-mins","sum-weights-mins"].forEach(id => document.getElementById(id).textContent = "loading…");
+
+      let allSessions = [];
+      try {
+        const resp = await fetch(SHEETS_URL + "?action=getSessions");
+        const data = await resp.json();
+        if (data.success) allSessions = data.sessions;
+      } catch(e) {
+        // Fall back to local sessions if fetch fails
+        allSessions = sessions;
+        document.getElementById("sum-mins-total").textContent = "⚠ Could not reach sheet — showing local data";
+      }
+
       const totals = { pt: {count:0,mins:0}, cardio: {count:0,mins:0}, weights: {count:0,mins:0} };
       let totalMins = 0;
-      sessions.forEach(s => {
-        totalMins += s.duration;
-        const cat = categorise(s.activity);
-        if (totals[cat]) { totals[cat].count++; totals[cat].mins += s.duration; }
+      allSessions.forEach(s => {
+        totalMins += parseInt(s.duration) || 0;
+        const cat = categorise(s.activity || "");
+        if (totals[cat]) { totals[cat].count++; totals[cat].mins += parseInt(s.duration) || 0; }
       });
-      document.getElementById("sum-total").textContent = sessions.length;
+
+      document.getElementById("sum-total").textContent = allSessions.length;
       document.getElementById("sum-mins-total").textContent = totalMins + " minutes";
       document.getElementById("sum-pt").textContent = totals.pt.count;
       document.getElementById("sum-pt-mins").textContent = totals.pt.mins + " minutes";
@@ -472,7 +488,7 @@
         if (!synced) allSynced = false;
       }
 
-      saveSessions(); renderTable(); updateStats(); updateSummary(); renderCalendar();
+      saveSessions(); renderTable(); updateStats(); renderCalendar();
 
       status.style.color = allSynced ? "var(--accent)" : "var(--danger)";
       status.textContent = allSynced
@@ -490,13 +506,13 @@
 
     function clearLog() {
       if (!confirm("Are you sure? This will delete all of your workouts.")) return;
-      sessions = []; saveSessions(); renderTable(); updateStats(); updateSummary(); renderCalendar();
+      sessions = []; saveSessions(); renderTable(); updateStats(); renderCalendar();
     }
 
     function deleteSession(id) {
       if (!confirm("Remove this session?")) return;
       sessions = sessions.filter(s => s.id !== id);
-      saveSessions(); renderTable(); updateStats(); updateSummary(); renderCalendar();
+      saveSessions(); renderTable(); updateStats(); renderCalendar();
     }
 
     function renderTable() {
