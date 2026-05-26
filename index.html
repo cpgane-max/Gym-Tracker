@@ -335,15 +335,45 @@
     }
 
     // --- Calendar ---
+    // --- Calendar ---
+    let sheetWorkoutMap = null; // cached after first fetch
+
     function toggleCalendar() {
       const toggle = document.getElementById("cal-toggle");
       const body = document.getElementById("cal-body");
       const isOpen = body.style.display !== "none";
       body.style.display = isOpen ? "none" : "block";
       toggle.classList.toggle("open", !isOpen);
+      if (!isOpen) loadCalendarData();
+    }
+
+    async function loadCalendarData() {
+      document.getElementById("cal-days").innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:1.5rem;color:var(--muted);font-size:13px;">Loading…</div>`;
+      try {
+        const resp = await fetch(SHEETS_URL + "?action=getSessions");
+        const data = await resp.json();
+        sheetWorkoutMap = {};
+        if (data.success) {
+          data.sessions.forEach(s => {
+            const dateStr = (s.date || "").toString().trim();
+            if (!sheetWorkoutMap[dateStr]) sheetWorkoutMap[dateStr] = [];
+            sheetWorkoutMap[dateStr].push(s);
+          });
+        }
+      } catch(e) {
+        // Fall back to local sessions
+        sheetWorkoutMap = {};
+        sessions.forEach(s => {
+          if (!sheetWorkoutMap[s.date]) sheetWorkoutMap[s.date] = [];
+          sheetWorkoutMap[s.date].push(s);
+        });
+      }
+      renderCalendar();
     }
 
     function getWorkoutsByDate() {
+      if (sheetWorkoutMap) return sheetWorkoutMap;
+      // Local fallback before first fetch
       const map = {};
       sessions.forEach(s => {
         if (!map[s.date]) map[s.date] = [];
@@ -361,15 +391,11 @@
       const firstDay = new Date(calYear, calMonth, 1);
       const lastDay = new Date(calYear, calMonth + 1, 0);
 
-      // Calendar starts on Wednesday (day 3)
-      // Find how many days to pad at the start
-      const firstDow = firstDay.getDay(); // 0=Sun
-      // offset: Wed=0, Thu=1, Fri=2, Sat=3, Sun=4, Mon=5, Tue=6
+      const firstDow = firstDay.getDay();
       const dowMap = {3:0,4:1,5:2,6:3,0:4,1:5,2:6};
       const startPad = dowMap[firstDow];
 
       let html = "";
-      // Padding cells from previous month
       for (let i = 0; i < startPad; i++) {
         const d = new Date(calYear, calMonth, 1 - (startPad - i));
         html += `<div class="cal-day other-month"><span>${d.getDate()}</span></div>`;
@@ -379,14 +405,13 @@
         const dateObj = new Date(calYear, calMonth, d);
         const dateStr = dateObj.toISOString().split("T")[0];
         const isToday = (dateObj.toDateString() === today.toDateString());
-        const hasW = !!workouts[dateStr];
+        const hasW = !!(workouts[dateStr] && workouts[dateStr].length);
         const classes = ["cal-day", isToday ? "today" : "", hasW ? "has-workout" : ""].filter(Boolean).join(" ");
         const dot = hasW ? `<span class="cal-dot"></span>` : "";
         const click = hasW ? `onclick="togglePopup(this,'${dateStr}')"` : "";
         html += `<div class="${classes}" ${click} style="position:relative;">${dot}<span>${d}</span></div>`;
       }
 
-      // Pad end to complete last row
       const totalCells = startPad + lastDay.getDate();
       const remainder = totalCells % 7;
       if (remainder > 0) {
@@ -394,12 +419,10 @@
           html += `<div class="cal-day other-month"><span>${i}</span></div>`;
         }
       }
-
       document.getElementById("cal-days").innerHTML = html;
     }
 
     function togglePopup(el, dateStr) {
-      // Close any open popup
       if (openPopup) { openPopup.remove(); openPopup = null; }
       const workouts = getWorkoutsByDate();
       const list = workouts[dateStr] || [];
@@ -488,7 +511,7 @@
         if (!synced) allSynced = false;
       }
 
-      saveSessions(); renderTable(); updateStats(); renderCalendar();
+      saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
 
       status.style.color = allSynced ? "var(--accent)" : "var(--danger)";
       status.textContent = allSynced
@@ -506,13 +529,13 @@
 
     function clearLog() {
       if (!confirm("Are you sure? This will delete all of your workouts.")) return;
-      sessions = []; saveSessions(); renderTable(); updateStats(); renderCalendar();
+      sessions = []; saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
     }
 
     function deleteSession(id) {
       if (!confirm("Remove this session?")) return;
       sessions = sessions.filter(s => s.id !== id);
-      saveSessions(); renderTable(); updateStats(); renderCalendar();
+      saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
     }
 
     function renderTable() {
@@ -544,7 +567,7 @@
     document.getElementById("f-week").value = getWeekNumber(todayStr);
     const now = new Date();
     calYear = now.getFullYear(); calMonth = now.getMonth();
-    renderTable(); updateStats(); renderCalendar();
+    renderTable(); updateStats();
 
     document.getElementById("f-date").addEventListener("change", function() {
       if (this.value) document.getElementById("f-week").value = getWeekNumber(this.value);
