@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sherrol's Gym Tracker</title>
-  <!-- BUILD: 2026-05-26 23:45 AEST -->
+  <!-- BUILD: 2026-05-27 10:30 AEST -->
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,7 +64,6 @@
 
     /* Calendar */
     .calendar-wrap { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 1.5rem; overflow: hidden; }
-    .cal-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.25rem; border-bottom: 0.5px solid var(--border); }
     .cal-title { font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
     .cal-nav { background: none; border: 0.5px solid var(--border2); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 3px 10px; font-size: 13px; }
     .cal-nav:hover { color: var(--text); border-color: var(--accent-dark); }
@@ -76,9 +75,10 @@
     .cal-day.today { background: var(--surface2); color: var(--accent); font-weight: 600; }
     .cal-day.other-month { color: rgba(255,255,255,0.2); }
     .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); position: absolute; top: 4px; left: 50%; transform: translateX(-50%); }
-    .cal-popup { position: absolute; top: 110%; left: 50%; transform: translateX(-50%); background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 8px 12px; font-size: 12px; z-index: 10; min-width: 160px; text-align: left; box-shadow: 0 4px 16px rgba(0,0,0,0.4); white-space: nowrap; }
-    .cal-popup-title { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); margin-bottom: 5px; letter-spacing: 0.05em; }
-    .cal-popup-item { font-size: 12px; color: var(--text); padding: 2px 0; border-bottom: 0.5px solid var(--border); }
+    /* Popup — fixed position to avoid clipping */
+    .cal-popup { position: fixed; background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; z-index: 100; min-width: 180px; max-width: 260px; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+    .cal-popup-title { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); margin-bottom: 6px; letter-spacing: 0.05em; }
+    .cal-popup-item { font-size: 12px; color: var(--text); padding: 4px 0; border-bottom: 0.5px solid var(--border); line-height: 1.4; }
     .cal-popup-item:last-child { border-bottom: none; }
 
     /* Form */
@@ -97,6 +97,7 @@
     .del-btn:hover { color: var(--danger); background: var(--danger-dim); }
     .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 13px; }
     .empty-state span { display: block; font-size: 28px; margin-bottom: 8px; }
+    select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888986' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
 
     @media (max-width: 520px) {
       .stats-row { gap: 6px; } .stat-val { font-size: 22px; }
@@ -125,7 +126,7 @@
       <div class="logo">
         <span class="logo-eyebrow">Training log</span>
         <h1>Sherrol's Gym Tracker</h1>
-        <div class="build-stamp" id="build-stamp"></div>
+        <div class="build-stamp">Build: 2026-05-27 10:30 AEST</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
         <div class="sheets-pill"><span class="dot"></span>Syncing to Google Sheets</div>
@@ -168,6 +169,11 @@
             <div class="summary-card-val" id="sum-weights">0</div>
             <div class="summary-card-sub" id="sum-weights-mins">0 minutes</div>
           </div>
+          <div class="summary-card">
+            <div class="summary-card-label">Cycle Sessions</div>
+            <div class="summary-card-val" id="sum-cycle">0</div>
+            <div class="summary-card-sub" id="sum-cycle-mins">0 minutes</div>
+          </div>
         </div>
       </div>
     </div>
@@ -187,7 +193,7 @@
           </div>
           <button class="cal-nav" onclick="calNext()">▶</button>
         </div>
-        <div class="cal-grid" id="cal-dow-row">
+        <div class="cal-grid">
           <div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
           <div class="cal-dow">Sat</div><div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div>
         </div>
@@ -213,9 +219,21 @@
           <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Activities</label>
           <div id="activity-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
           <div style="display:grid;grid-template-columns:1fr 100px 32px;gap:8px;align-items:center;">
-            <input type="text" id="f-activity" placeholder="Activity e.g. Weights – chest" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+            <div style="position:relative;">
+              <select id="f-activity-select" onchange="onActivitySelect()" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 2rem 0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;cursor:pointer;">
+                <option value="">— Select activity —</option>
+                <option value="PT">PT</option>
+                <option value="Weights">Weights</option>
+                <option value="Spin">Spin</option>
+                <option value="Spinlates">Spinlates</option>
+                <option value="other">Other (type below)…</option>
+              </select>
+            </div>
             <input type="number" id="f-duration" placeholder="Min" min="1" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
             <button onclick="addActivity()" title="Add activity" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--accent);font-size:20px;cursor:pointer;height:38px;width:32px;display:flex;align-items:center;justify-content:center;padding:0;">+</button>
+          </div>
+          <div id="f-activity-custom-wrap" style="display:none;margin-top:8px;">
+            <input type="text" id="f-activity-custom" placeholder="Type your activity..." style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
           </div>
         </div>
         <div>
@@ -232,8 +250,12 @@
     <!-- History -->
     <div class="history-header">
       <span class="section-label">Session history</span>
-      <button onclick="clearLog()" style="background:none;border:0.5px solid var(--danger);color:var(--danger);border-radius:var(--radius);padding:5px 14px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">CLEAR LOG</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button onclick="syncFromSheet()" style="background:none;border:0.5px solid var(--accent-dark);color:var(--accent);border-radius:var(--radius);padding:5px 14px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;opacity:0.8;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'" id="sync-btn">↓ SYNC FROM SHEET</button>
+        <button onclick="clearLog()" style="background:none;border:0.5px solid var(--danger);color:var(--danger);border-radius:var(--radius);padding:5px 14px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">CLEAR LOG</button>
+      </div>
     </div>
+    <div id="sync-status" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px;min-height:16px;"></div>
     <div class="table-wrap">
       <table>
         <thead>
@@ -252,33 +274,97 @@
   <script>
     const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwniwZzPNkyrN06U-t4O11tXlomuY2WPgxlfmypAV1qaGsR3pitDCNBuCzwdo1Xjc1j/exec";
     const STORAGE_KEY = "gym_sessions_v1";
-    // Week 1 starts on Wed 22 Oct 2025
-    const WEEK1_START = new Date("2025-10-22");
+    const WEEK1_START = new Date("2025-10-22T00:00:00");
 
     let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     let calYear, calMonth, openPopup = null;
 
-    // Build stamp
-    document.getElementById("build-stamp").textContent = "Build: 2026-05-26 23:45 AEST";
-
     function saveSessions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions)); }
+
+    // --- Local date helpers (timezone-safe) ---
+    function localToday() {
+      const d = new Date();
+      return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+    }
 
     function getWeekNumber(dateStr) {
       const d = new Date(dateStr + "T00:00:00");
-      // Find the most recent Wednesday on or before d
-      const day = d.getDay(); // 0=Sun,1=Mon,...,3=Wed
+      const day = d.getDay();
       const daysToWed = (day >= 3) ? day - 3 : day + 4;
       const weekStart = new Date(d);
       weekStart.setDate(d.getDate() - daysToWed);
       weekStart.setHours(0,0,0,0);
-      // Diff in weeks from WEEK1_START
       const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-      const weekNum = Math.floor((weekStart - WEEK1_START) / msPerWeek) + 1;
-      return Math.max(1, weekNum);
+      return Math.max(1, Math.floor((weekStart - WEEK1_START) / msPerWeek) + 1);
     }
 
-    function getCurrentWeek() { return getWeekNumber(new Date().toISOString().split("T")[0]); }
+    function getCurrentWeek() { return getWeekNumber(localToday()); }
 
+    function normaliseDateStr(val) {
+      if (!val) return "";
+      const s = val.toString().trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+        const [d, m, y] = s.split("/");
+        return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
+      }
+      if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+        const [d, m, y] = s.split("-");
+        return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
+      }
+      return s;
+    }
+
+    // --- Category logic ---
+    function categorise(activity) {
+      const a = (activity || "").trim().toLowerCase();
+      if (a === "pt") return "pt";
+      if (a === "weights") return "weights";
+      if (a === "spin" || a === "spinlates") return "cycle";
+      return "cardio"; // everything else
+    }
+
+    // --- Sync FROM sheet ---
+    async function syncFromSheet() {
+      const btn = document.getElementById("sync-btn");
+      const status = document.getElementById("sync-status");
+      btn.disabled = true;
+      status.style.color = "var(--muted)";
+      status.textContent = "Fetching from Google Sheets…";
+      try {
+        const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
+        const data = await resp.json();
+        if (data.success && data.sessions.length) {
+          // Rebuild local sessions from sheet data
+          sessions = data.sessions.map((s, i) => ({
+            id: Date.now() + i,
+            date: normaliseDateStr(s.date),
+            week: parseInt(s.week) || getWeekNumber(normaliseDateStr(s.date)),
+            activity: s.activity,
+            duration: parseInt(s.duration) || 0,
+            comments: s.comments || "—"
+          }));
+          // Sort newest first
+          sessions.sort((a, b) => b.date.localeCompare(a.date));
+          saveSessions();
+          renderTable();
+          updateStats();
+          sheetWorkoutMap = null;
+          status.style.color = "var(--accent)";
+          status.textContent = `✓ Synced ${sessions.length} sessions from Google Sheets`;
+        } else {
+          status.style.color = "var(--danger)";
+          status.textContent = "No data returned from sheet.";
+        }
+      } catch(e) {
+        status.style.color = "var(--danger)";
+        status.textContent = "⚠ Could not reach Google Sheets.";
+      }
+      btn.disabled = false;
+      setTimeout(() => { status.textContent = ""; }, 5000);
+    }
+
+    // --- Sync TO sheet ---
     async function syncToSheets(session) {
       try {
         const params = new URLSearchParams({ week: session.week, date: session.date, activity: session.activity, duration: session.duration, comments: session.comments });
@@ -296,36 +382,28 @@
       if (body.classList.contains("open")) updateSummary();
     }
 
-    function categorise(activity) {
-      const a = activity.toLowerCase();
-      if (a.includes("pt") || a.includes("personal train")) return "pt";
-      if (a.includes("run") || a.includes("cardio") || a.includes("treadmill") || a.includes("cycle") || a.includes("bike") || a.includes("rowing") || a.includes("walk") || a.includes("swim") || a.includes("hiit") || a.includes("stair")) return "cardio";
-      if (a.includes("weight") || a.includes("lift") || a.includes("squat") || a.includes("bench") || a.includes("deadlift") || a.includes("chest") || a.includes("back") || a.includes("shoulder") || a.includes("leg") || a.includes("arm") || a.includes("bicep") || a.includes("tricep") || a.includes("press")) return "weights";
-      return "other";
-    }
-
     async function updateSummary() {
-      // Show loading state
-      ["sum-total","sum-pt","sum-cardio","sum-weights"].forEach(id => document.getElementById(id).textContent = "…");
-      ["sum-mins-total","sum-pt-mins","sum-cardio-mins","sum-weights-mins"].forEach(id => document.getElementById(id).textContent = "loading…");
+      ["sum-total","sum-pt","sum-cardio","sum-weights","sum-cycle"].forEach(id => document.getElementById(id).textContent = "…");
+      ["sum-mins-total","sum-pt-mins","sum-cardio-mins","sum-weights-mins","sum-cycle-mins"].forEach(id => document.getElementById(id).textContent = "loading…");
 
       let allSessions = [];
       try {
         const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
         const data = await resp.json();
         if (data.success) allSessions = data.sessions;
+        else throw new Error();
       } catch(e) {
-        // Fall back to local sessions if fetch fails
         allSessions = sessions;
-        document.getElementById("sum-mins-total").textContent = "⚠ Could not reach sheet — showing local data";
+        document.getElementById("sum-mins-total").textContent = "⚠ Showing local data";
       }
 
-      const totals = { pt: {count:0,mins:0}, cardio: {count:0,mins:0}, weights: {count:0,mins:0} };
+      const totals = { pt:{count:0,mins:0}, cardio:{count:0,mins:0}, weights:{count:0,mins:0}, cycle:{count:0,mins:0} };
       let totalMins = 0;
       allSessions.forEach(s => {
-        totalMins += parseInt(s.duration) || 0;
+        const dur = parseInt(s.duration) || 0;
+        totalMins += dur;
         const cat = categorise(s.activity || "");
-        if (totals[cat]) { totals[cat].count++; totals[cat].mins += parseInt(s.duration) || 0; }
+        totals[cat].count++; totals[cat].mins += dur;
       });
 
       document.getElementById("sum-total").textContent = allSessions.length;
@@ -336,11 +414,12 @@
       document.getElementById("sum-cardio-mins").textContent = totals.cardio.mins + " minutes";
       document.getElementById("sum-weights").textContent = totals.weights.count;
       document.getElementById("sum-weights-mins").textContent = totals.weights.mins + " minutes";
+      document.getElementById("sum-cycle").textContent = totals.cycle.count;
+      document.getElementById("sum-cycle-mins").textContent = totals.cycle.mins + " minutes";
     }
 
     // --- Calendar ---
-    // --- Calendar ---
-    let sheetWorkoutMap = null; // cached after first fetch
+    let sheetWorkoutMap = null;
 
     function toggleCalendar() {
       const toggle = document.getElementById("cal-toggle");
@@ -367,11 +446,8 @@
           });
           const total = data.sessions.length;
           const days = Object.keys(sheetWorkoutMap).length;
-          const sampleDates = Object.keys(sheetWorkoutMap).slice(0,5).join(", ");
-          document.getElementById("cal-status").textContent = `${total} sessions loaded — matched dates: ${sampleDates || "none"}`;
-        } else {
-          throw new Error("Sheet returned success:false");
-        }
+          document.getElementById("cal-status").textContent = `${total} session${total!==1?"s":""} across ${days} day${days!==1?"s":""} — loaded from Google Sheets`;
+        } else { throw new Error(); }
       } catch(e) {
         sheetWorkoutMap = {};
         sessions.forEach(s => {
@@ -380,69 +456,52 @@
           sheetWorkoutMap[d].push(s);
         });
         document.getElementById("cal-status").style.color = "var(--danger)";
-        document.getElementById("cal-status").textContent = "⚠ Using local data only — check Apps Script is redeployed as a new version";
+        document.getElementById("cal-status").textContent = "⚠ Using local data only";
       }
       renderCalendar();
     }
 
     function getWorkoutsByDate() {
       if (sheetWorkoutMap) return sheetWorkoutMap;
-      // Local fallback before first fetch
       const map = {};
-      sessions.forEach(s => {
-        if (!map[s.date]) map[s.date] = [];
-        map[s.date].push(s);
-      });
+      sessions.forEach(s => { if (!map[s.date]) map[s.date] = []; map[s.date].push(s); });
       return map;
     }
 
     function renderCalendar() {
       const workouts = getWorkoutsByDate();
-      const today = new Date();
-      const todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
+      const todayStr = localToday();
       const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
       document.getElementById("cal-title").textContent = monthNames[calMonth] + " " + calYear;
 
       const firstDay = new Date(calYear, calMonth, 1);
       const lastDay = new Date(calYear, calMonth + 1, 0);
-
-      const firstDow = firstDay.getDay();
       const dowMap = {3:0,4:1,5:2,6:3,0:4,1:5,2:6};
-      const startPad = dowMap[firstDow];
+      const startPad = dowMap[firstDay.getDay()];
 
-      // Helper: local YYYY-MM-DD from a Date object (avoids UTC shift for Australian timezone)
-      function localDateStr(d) {
-        return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-      }
+      function lds(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 
       let html = "";
       for (let i = 0; i < startPad; i++) {
-        const d = new Date(calYear, calMonth, 1 - (startPad - i));
+        const d = new Date(calYear, calMonth, 1-(startPad-i));
         html += `<div class="cal-day other-month"><span>${d.getDate()}</span></div>`;
       }
-
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const dateObj = new Date(calYear, calMonth, d);
-        const dateStr = localDateStr(dateObj);
-        const isToday = (dateStr === todayStr);
+        const dateStr = lds(dateObj);
+        const isToday = dateStr === todayStr;
         const hasW = !!(workouts[dateStr] && workouts[dateStr].length);
-        const classes = ["cal-day", isToday ? "today" : "", hasW ? "has-workout" : ""].filter(Boolean).join(" ");
+        const cls = ["cal-day", isToday?"today":"", hasW?"has-workout":""].filter(Boolean).join(" ");
         const dot = hasW ? `<span class="cal-dot"></span>` : "";
-        const click = hasW ? `onclick="togglePopup(this,'${dateStr}')"` : "";
-        html += `<div class="${classes}" ${click} style="position:relative;">${dot}<span>${d}</span></div>`;
+        const click = hasW ? `onclick="togglePopup(event,'${dateStr}')"` : "";
+        html += `<div class="${cls}" ${click}>${dot}<span>${d}</span></div>`;
       }
-
-      const totalCells = startPad + lastDay.getDate();
-      const remainder = totalCells % 7;
-      if (remainder > 0) {
-        for (let i = 1; i <= 7 - remainder; i++) {
-          html += `<div class="cal-day other-month"><span>${i}</span></div>`;
-        }
-      }
+      const rem = (startPad + lastDay.getDate()) % 7;
+      if (rem > 0) for (let i = 1; i <= 7-rem; i++) html += `<div class="cal-day other-month"><span>${i}</span></div>`;
       document.getElementById("cal-days").innerHTML = html;
     }
 
-    function togglePopup(el, dateStr) {
+    function togglePopup(event, dateStr) {
       if (openPopup) { openPopup.remove(); openPopup = null; }
       const workouts = getWorkoutsByDate();
       const list = workouts[dateStr] || [];
@@ -450,61 +509,52 @@
       popup.className = "cal-popup";
       popup.innerHTML = `<div class="cal-popup-title">${dateStr}</div>` +
         list.map(s => `<div class="cal-popup-item">${s.activity} — ${s.duration} min</div>`).join("");
-      el.appendChild(popup);
+      document.body.appendChild(popup);
+      // Position near click, but keep within viewport
+      const x = Math.min(event.clientX + 8, window.innerWidth - 280);
+      const y = Math.min(event.clientY + 8, window.innerHeight - (list.length * 32 + 60));
+      popup.style.left = x + "px";
+      popup.style.top = y + "px";
       openPopup = popup;
       setTimeout(() => {
         document.addEventListener("click", function closeP(e) {
-          if (!el.contains(e.target)) { popup.remove(); openPopup = null; document.removeEventListener("click", closeP); }
+          if (!popup.contains(e.target)) { popup.remove(); openPopup = null; document.removeEventListener("click", closeP); }
         });
       }, 0);
     }
 
-    function calPrev() {
-      calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
-      renderCalendar();
-    }
-    function calNext() {
-      calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
-      renderCalendar();
-    }
-    function calGoToday() {
-      const now = new Date();
-      calYear = now.getFullYear(); calMonth = now.getMonth();
-      renderCalendar();
+    function calPrev() { calMonth--; if (calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
+    function calNext() { calMonth++; if (calMonth>11){calMonth=0;calYear++;} renderCalendar(); }
+    function calGoToday() { const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); renderCalendar(); }
+
+    // --- Activity picklist ---
+    function onActivitySelect() {
+      const sel = document.getElementById("f-activity-select").value;
+      const customWrap = document.getElementById("f-activity-custom-wrap");
+      customWrap.style.display = sel === "other" ? "block" : "none";
+      if (sel === "other") document.getElementById("f-activity-custom").focus();
     }
 
-    // Normalise any date string to YYYY-MM-DD on the client side too
-    function normaliseDateStr(val) {
-      if (!val) return "";
-      const s = val.toString().trim();
-      // Already YYYY-MM-DD
-      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-      // DD/MM/YYYY
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-        const [d, m, y] = s.split("/");
-        return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
-      }
-      // DD-MM-YYYY
-      if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
-        const [d, m, y] = s.split("-");
-        return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
-      }
-      return s;
+    function getSelectedActivity() {
+      const sel = document.getElementById("f-activity-select").value;
+      if (sel === "other") return document.getElementById("f-activity-custom").value.trim();
+      return sel;
     }
 
     // --- Staging ---
     let stagedActivities = [];
 
     function addActivity() {
-      const activity = document.getElementById("f-activity").value.trim();
+      const activity = getSelectedActivity();
       const duration = parseInt(document.getElementById("f-duration").value);
       const status = document.getElementById("log-status");
-      if (!activity) { status.style.color = "var(--danger)"; status.textContent = "Please enter an activity."; return; }
-      if (!duration || duration < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a valid duration."; return; }
+      if (!activity) { status.style.color="var(--danger)"; status.textContent="Please select or enter an activity."; return; }
+      if (!duration || duration < 1) { status.style.color="var(--danger)"; status.textContent="Please enter a valid duration."; return; }
       stagedActivities.push({ activity, duration });
-      document.getElementById("f-activity").value = "";
+      document.getElementById("f-activity-select").value = "";
+      document.getElementById("f-activity-custom").value = "";
+      document.getElementById("f-activity-custom-wrap").style.display = "none";
       document.getElementById("f-duration").value = "";
-      document.getElementById("f-activity").focus();
       status.textContent = "";
       renderStaged();
     }
@@ -514,7 +564,7 @@
     function renderStaged() {
       const list = document.getElementById("activity-list");
       if (!stagedActivities.length) { list.innerHTML = ""; return; }
-      list.innerHTML = stagedActivities.map((a, i) => `
+      list.innerHTML = stagedActivities.map((a,i) => `
         <div style="display:grid;grid-template-columns:1fr 100px 32px;gap:8px;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px 10px;">
           <span style="font-size:13px;font-weight:500;">${a.activity}</span>
           <span style="font-size:13px;color:var(--muted);">${a.duration} min</span>
@@ -531,11 +581,14 @@
       if (!dateVal) { status.style.color="var(--danger)"; status.textContent="Please select a date."; return; }
       if (!weekVal || weekVal < 1) { status.style.color="var(--danger)"; status.textContent="Please enter a week number."; return; }
 
-      const pendingActivity = document.getElementById("f-activity").value.trim();
+      // Include any unsaved activity in the inputs
+      const pendingActivity = getSelectedActivity();
       const pendingDuration = parseInt(document.getElementById("f-duration").value);
       if (pendingActivity && pendingDuration > 0) {
         stagedActivities.push({ activity: pendingActivity, duration: pendingDuration });
-        document.getElementById("f-activity").value = "";
+        document.getElementById("f-activity-select").value = "";
+        document.getElementById("f-activity-custom").value = "";
+        document.getElementById("f-activity-custom-wrap").style.display = "none";
         document.getElementById("f-duration").value = "";
         renderStaged();
       }
@@ -545,11 +598,11 @@
       const btn = document.getElementById("send-btn");
       btn.disabled = true;
       status.style.color = "var(--muted)";
-      status.textContent = `Syncing ${stagedActivities.length} activit${stagedActivities.length > 1 ? "ies" : "y"}...`;
+      status.textContent = `Syncing ${stagedActivities.length} activit${stagedActivities.length>1?"ies":"y"}...`;
 
       let allSynced = true;
       for (const a of stagedActivities) {
-        const session = { id: Date.now() + Math.random(), date: dateVal, week: weekVal, activity: a.activity, duration: a.duration, comments: comments || "—" };
+        const session = { id: Date.now()+Math.random(), date: dateVal, week: weekVal, activity: a.activity, duration: a.duration, comments: comments||"—" };
         sessions.unshift(session);
         const synced = await syncToSheets(session);
         if (!synced) allSynced = false;
@@ -559,14 +612,14 @@
 
       status.style.color = allSynced ? "var(--accent)" : "var(--danger)";
       status.textContent = allSynced
-        ? `✓ ${stagedActivities.length} activit${stagedActivities.length > 1 ? "ies" : "y"} logged & synced!`
+        ? `✓ ${stagedActivities.length} activit${stagedActivities.length>1?"ies":"y"} logged & synced!`
         : "Saved locally — couldn't reach Google Sheets.";
 
       stagedActivities = []; renderStaged();
       document.getElementById("f-comments").value = "";
-      const today = new Date().toISOString().split("T")[0];
-      document.getElementById("f-date").value = today;
-      document.getElementById("f-week").value = getWeekNumber(today);
+      const t = localToday();
+      document.getElementById("f-date").value = t;
+      document.getElementById("f-week").value = getWeekNumber(t);
       btn.disabled = false;
       setTimeout(() => { status.textContent = ""; }, 4000);
     }
@@ -601,14 +654,14 @@
 
     function updateStats() {
       document.getElementById("stat-count").textContent = sessions.length;
-      document.getElementById("stat-mins").textContent = sessions.reduce((a,s) => a + s.duration, 0);
-      document.getElementById("stat-week").textContent = sessions.filter(s => s.week === getCurrentWeek()).length;
+      document.getElementById("stat-mins").textContent = sessions.reduce((a,s)=>a+s.duration,0);
+      document.getElementById("stat-week").textContent = sessions.filter(s=>s.week===getCurrentWeek()).length;
     }
 
     // Init
-    const todayStr = new Date().toISOString().split("T")[0];
-    document.getElementById("f-date").value = todayStr;
-    document.getElementById("f-week").value = getWeekNumber(todayStr);
+    const t = localToday();
+    document.getElementById("f-date").value = t;
+    document.getElementById("f-week").value = getWeekNumber(t);
     const now = new Date();
     calYear = now.getFullYear(); calMonth = now.getMonth();
     renderTable(); updateStats();
@@ -616,17 +669,15 @@
     document.getElementById("f-date").addEventListener("change", function() {
       if (this.value) document.getElementById("f-week").value = getWeekNumber(this.value);
     });
-    document.getElementById("f-activity").addEventListener("keydown", e => { if (e.key === "Enter") addActivity(); });
-    document.getElementById("f-duration").addEventListener("keydown", e => { if (e.key === "Enter") addActivity(); });
+    document.getElementById("f-duration").addEventListener("keydown", e => { if (e.key==="Enter") addActivity(); });
   </script>
 
   <script>
     const APP_PASSWORD = "gymtime"; // ← change password here
-
     function checkPassword() {
       const val = document.getElementById("pw-input").value;
       if (val === APP_PASSWORD) {
-        sessionStorage.setItem("gym_unlocked", "1");
+        sessionStorage.setItem("gym_unlocked","1");
         document.getElementById("lock-screen").style.display = "none";
         document.getElementById("app").style.display = "block";
       } else {
@@ -634,11 +685,11 @@
         err.textContent = "Incorrect password — try again.";
         document.getElementById("pw-input").value = "";
         document.getElementById("pw-input").focus();
-        setTimeout(() => { err.textContent = ""; }, 3000);
+        setTimeout(()=>{err.textContent="";},3000);
       }
     }
-    document.getElementById("pw-input").addEventListener("keydown", e => { if (e.key === "Enter") checkPassword(); });
-    if (sessionStorage.getItem("gym_unlocked") === "1") {
+    document.getElementById("pw-input").addEventListener("keydown", e => { if (e.key==="Enter") checkPassword(); });
+    if (sessionStorage.getItem("gym_unlocked")==="1") {
       document.getElementById("lock-screen").style.display = "none";
       document.getElementById("app").style.display = "block";
     }
