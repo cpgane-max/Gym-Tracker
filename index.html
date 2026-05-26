@@ -183,7 +183,7 @@
           <button class="cal-nav" onclick="calPrev()">◀</button>
           <div style="display:flex;align-items:center;gap:10px;">
             <span class="cal-title" id="cal-title"></span>
-            <button class="cal-nav" onclick="calGoToday()" style="font-size:10px;padding:3px 9px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">TODAY</button>
+            <button class="cal-nav" onclick="calGoToday()" style="font-size:10px;padding:3px 9px;font-family:'DM Mono',monospace;letter-spacing:0.05em;color:var(--accent);border-color:var(--accent-dark);">TODAY</button>
           </div>
           <button class="cal-nav" onclick="calNext()">▶</button>
         </div>
@@ -192,6 +192,7 @@
           <div class="cal-dow">Sat</div><div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div>
         </div>
         <div class="cal-grid" id="cal-days"></div>
+        <div id="cal-status" style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding:6px 0 10px;letter-spacing:0.05em;"></div>
       </div>
     </div>
 
@@ -352,6 +353,8 @@
 
     async function loadCalendarData() {
       document.getElementById("cal-days").innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:1.5rem;color:var(--muted);font-size:13px;">Loading…</div>`;
+      document.getElementById("cal-status").textContent = "";
+      document.getElementById("cal-status").style.color = "var(--muted)";
       try {
         const resp = await fetch(SHEETS_URL + "?action=getSessions");
         const data = await resp.json();
@@ -362,14 +365,21 @@
             if (!sheetWorkoutMap[dateStr]) sheetWorkoutMap[dateStr] = [];
             sheetWorkoutMap[dateStr].push(s);
           });
+          const total = data.sessions.length;
+          const days = Object.keys(sheetWorkoutMap).length;
+          document.getElementById("cal-status").textContent = `${total} session${total !== 1 ? "s" : ""} across ${days} day${days !== 1 ? "s" : ""} loaded from Google Sheets`;
+        } else {
+          throw new Error("Sheet returned success:false");
         }
       } catch(e) {
-        // Fall back to local sessions
         sheetWorkoutMap = {};
         sessions.forEach(s => {
-          if (!sheetWorkoutMap[s.date]) sheetWorkoutMap[s.date] = [];
-          sheetWorkoutMap[s.date].push(s);
+          const d = normaliseDateStr(s.date);
+          if (!sheetWorkoutMap[d]) sheetWorkoutMap[d] = [];
+          sheetWorkoutMap[d].push(s);
         });
+        document.getElementById("cal-status").style.color = "var(--danger)";
+        document.getElementById("cal-status").textContent = "⚠ Using local data only — check Apps Script is redeployed as a new version";
       }
       renderCalendar();
     }
