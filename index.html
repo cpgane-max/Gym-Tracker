@@ -421,11 +421,14 @@
     <header>
       <div class="logo">
         <span class="logo-eyebrow">Training log</span>
-        <h1>Gym Tracker</h1>
+        <h1>Sherrol's Gym Tracker</h1>
       </div>
-      <div class="sheets-pill">
-        <span class="dot"></span>
-        Syncing to Google Sheets
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div class="sheets-pill">
+          <span class="dot"></span>
+          Syncing to Google Sheets
+        </div>
+        <a href="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:var(--muted);text-decoration:none;border-bottom:0.5px solid var(--border2);padding-bottom:1px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">View Google Sheet →</a>
       </div>
     </header>
 
@@ -446,6 +449,16 @@
 
     <div class="chat-wrap">
       <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Date</label>
+            <input type="date" id="f-date" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;color-scheme:dark;" />
+          </div>
+          <div>
+            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Week number</label>
+            <input type="number" id="f-week" min="1" max="53" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
+          </div>
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
             <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Activity</label>
@@ -469,6 +482,7 @@
 
     <div class="history-header">
       <span class="section-label">Session history</span>
+      <button onclick="clearLog()" style="background:none;border:0.5px solid var(--danger);color:var(--danger);border-radius:var(--radius);padding:5px 14px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">CLEAR LOG</button>
     </div>
 
     <div class="table-wrap">
@@ -501,8 +515,12 @@
 
     function getWeekNumber(dateStr) {
       const d = new Date(dateStr);
-      const jan1 = new Date(d.getFullYear(), 0, 1);
-      return Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+      // Shift the date back by 3 days so Wednesday (day 3) becomes the start of the week
+      // This means weeks run Wed–Tue, incrementing on Wednesday
+      const shifted = new Date(d);
+      shifted.setDate(d.getDate() - 3);
+      const jan1 = new Date(shifted.getFullYear(), 0, 1);
+      return Math.ceil(((shifted - jan1) / 86400000 + jan1.getDay() + 1) / 7);
     }
 
     function getCurrentWeek() {
@@ -529,11 +547,15 @@
     }
 
     async function logSession() {
+      const dateVal = document.getElementById("f-date").value;
+      const weekVal = parseInt(document.getElementById("f-week").value);
       const activity = document.getElementById("f-activity").value.trim();
       const duration = parseInt(document.getElementById("f-duration").value);
       const comments = document.getElementById("f-comments").value.trim();
       const status = document.getElementById("log-status");
 
+      if (!dateVal) { status.style.color = "var(--danger)"; status.textContent = "Please select a date."; return; }
+      if (!weekVal || weekVal < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a week number."; return; }
       if (!activity) { status.style.color = "var(--danger)"; status.textContent = "Please enter an activity."; return; }
       if (!duration || duration < 1) { status.style.color = "var(--danger)"; status.textContent = "Please enter a valid duration."; return; }
 
@@ -542,11 +564,10 @@
       status.style.color = "var(--muted)";
       status.textContent = "Syncing...";
 
-      const dateStr = new Date().toISOString().split("T")[0];
       const session = {
         id: Date.now(),
-        date: dateStr,
-        week: getWeekNumber(dateStr),
+        date: dateVal,
+        week: weekVal,
         activity,
         duration,
         comments: comments || "—"
@@ -564,8 +585,21 @@
       document.getElementById("f-activity").value = "";
       document.getElementById("f-duration").value = "";
       document.getElementById("f-comments").value = "";
+      // Reset date and week to today
+      const today = new Date().toISOString().split("T")[0];
+      document.getElementById("f-date").value = today;
+      document.getElementById("f-week").value = getWeekNumber(today);
+
       btn.disabled = false;
       setTimeout(() => { status.textContent = ""; }, 4000);
+    }
+
+    function clearLog() {
+      if (!confirm("Are you sure? This will delete all of your workouts.")) return;
+      sessions = [];
+      saveSessions();
+      renderTable();
+      updateStats();
     }
 
     function deleteSession(id) {
@@ -602,6 +636,16 @@
 
     renderTable();
     updateStats();
+
+    // Pre-populate date and week with today
+    const todayStr = new Date().toISOString().split("T")[0];
+    document.getElementById("f-date").value = todayStr;
+    document.getElementById("f-week").value = getWeekNumber(todayStr);
+
+    // Auto-update week when date changes
+    document.getElementById("f-date").addEventListener("change", function() {
+      if (this.value) document.getElementById("f-week").value = getWeekNumber(this.value);
+    });
   </script>
 
   <script>
