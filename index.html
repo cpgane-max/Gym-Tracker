@@ -367,7 +367,8 @@
           });
           const total = data.sessions.length;
           const days = Object.keys(sheetWorkoutMap).length;
-          document.getElementById("cal-status").textContent = `${total} session${total !== 1 ? "s" : ""} across ${days} day${days !== 1 ? "s" : ""} loaded from Google Sheets`;
+          const sampleDates = Object.keys(sheetWorkoutMap).slice(0,5).join(", ");
+          document.getElementById("cal-status").textContent = `${total} sessions loaded — matched dates: ${sampleDates || "none"}`;
         } else {
           throw new Error("Sheet returned success:false");
         }
