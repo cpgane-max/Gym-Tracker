@@ -148,31 +148,33 @@
         <span class="chevron">▼</span>
       </button>
       <div class="summary-body" id="summary-body">
-        <div class="summary-grid">
-          <div class="summary-card">
+        <div style="margin-top:1rem;display:flex;flex-direction:column;gap:10px;">
+          <div class="summary-card" style="text-align:center;">
             <div class="summary-card-label">Total Sessions</div>
             <div class="summary-card-val" id="sum-total">0</div>
             <div class="summary-card-sub" id="sum-mins-total">0 minutes</div>
           </div>
-          <div class="summary-card">
-            <div class="summary-card-label">PT Sessions</div>
-            <div class="summary-card-val" id="sum-pt">0</div>
-            <div class="summary-card-sub" id="sum-pt-mins">0 minutes</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-card-label">Cardio Workouts</div>
-            <div class="summary-card-val" id="sum-cardio">0</div>
-            <div class="summary-card-sub" id="sum-cardio-mins">0 minutes</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-card-label">Weights Sessions</div>
-            <div class="summary-card-val" id="sum-weights">0</div>
-            <div class="summary-card-sub" id="sum-weights-mins">0 minutes</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-card-label">Cycle Sessions</div>
-            <div class="summary-card-val" id="sum-cycle">0</div>
-            <div class="summary-card-sub" id="sum-cycle-mins">0 minutes</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="summary-card" style="text-align:center;">
+              <div class="summary-card-label">PT Sessions</div>
+              <div class="summary-card-val" id="sum-pt">0</div>
+              <div class="summary-card-sub" id="sum-pt-mins">0 minutes</div>
+            </div>
+            <div class="summary-card" style="text-align:center;">
+              <div class="summary-card-label">Cycle Sessions</div>
+              <div class="summary-card-val" id="sum-cycle">0</div>
+              <div class="summary-card-sub" id="sum-cycle-mins">0 minutes</div>
+            </div>
+            <div class="summary-card" style="text-align:center;">
+              <div class="summary-card-label">Cardio Workouts</div>
+              <div class="summary-card-val" id="sum-cardio">0</div>
+              <div class="summary-card-sub" id="sum-cardio-mins">0 minutes</div>
+            </div>
+            <div class="summary-card" style="text-align:center;">
+              <div class="summary-card-label">Weights Sessions</div>
+              <div class="summary-card-val" id="sum-weights">0</div>
+              <div class="summary-card-sub" id="sum-weights-mins">0 minutes</div>
+            </div>
           </div>
         </div>
       </div>
@@ -324,34 +326,49 @@
       return "cardio"; // everything else
     }
 
-    // --- Sync FROM sheet ---
+    // --- Sync FROM sheet (current week only) ---
     async function syncFromSheet() {
       const btn = document.getElementById("sync-btn");
       const status = document.getElementById("sync-status");
       btn.disabled = true;
       status.style.color = "var(--muted)";
-      status.textContent = "Fetching from Google Sheets…";
+      status.textContent = "Fetching this week from Google Sheets…";
       try {
         const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
         const data = await resp.json();
         if (data.success && data.sessions.length) {
-          // Rebuild local sessions from sheet data
-          sessions = data.sessions.map((s, i) => ({
-            id: Date.now() + i,
-            date: normaliseDateStr(s.date),
-            week: parseInt(s.week) || getWeekNumber(normaliseDateStr(s.date)),
-            activity: s.activity,
-            duration: parseInt(s.duration) || 0,
-            comments: s.comments || "—"
-          }));
-          // Sort newest first
+          const thisWeek = getCurrentWeek();
+          const weekSessions = data.sessions
+            .filter(s => parseInt(s.week) === thisWeek)
+            .map((s, i) => ({
+              id: Date.now() + i,
+              date: normaliseDateStr(s.date),
+              week: parseInt(s.week) || getWeekNumber(normaliseDateStr(s.date)),
+              activity: s.activity,
+              duration: parseInt(s.duration) || 0,
+              comments: s.comments || "—"
+            }));
+
+          if (!weekSessions.length) {
+            status.style.color = "var(--muted)";
+            status.textContent = `No sessions found for week ${thisWeek}.`;
+            btn.disabled = false;
+            setTimeout(() => { status.textContent = ""; }, 4000);
+            return;
+          }
+
+          // Merge: keep existing local sessions not in this week, replace this week with sheet data
+          sessions = [
+            ...weekSessions,
+            ...sessions.filter(s => s.week !== thisWeek)
+          ];
           sessions.sort((a, b) => b.date.localeCompare(a.date));
           saveSessions();
           renderTable();
           updateStats();
           sheetWorkoutMap = null;
           status.style.color = "var(--accent)";
-          status.textContent = `✓ Synced ${sessions.length} sessions from Google Sheets`;
+          status.textContent = `✓ Synced ${weekSessions.length} session${weekSessions.length!==1?"s":""} for week ${thisWeek}`;
         } else {
           status.style.color = "var(--danger)";
           status.textContent = "No data returned from sheet.";
