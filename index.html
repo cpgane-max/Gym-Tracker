@@ -739,13 +739,15 @@
       if (e.target === this) confirmDelete(3);
     });
 
-    // Init
-    const t = localToday();
-    document.getElementById("f-date").value = t;
-    document.getElementById("f-week").value = getWeekNumber(t);
-    const now = new Date();
-    calYear = now.getFullYear(); calMonth = now.getMonth();
-    renderTable(); updateStats();
+    // Init — called after unlock
+    function initApp() {
+      const t = localToday();
+      document.getElementById("f-date").value = t;
+      document.getElementById("f-week").value = getWeekNumber(t);
+      const now = new Date();
+      calYear = now.getFullYear(); calMonth = now.getMonth();
+      renderTable(); updateStats();
+    }
 
     document.getElementById("f-date").addEventListener("change", function() {
       if (this.value) document.getElementById("f-week").value = getWeekNumber(this.value);
@@ -761,6 +763,7 @@
         sessionStorage.setItem("gym_unlocked","1");
         document.getElementById("lock-screen").style.display = "none";
         document.getElementById("app").style.display = "block";
+        initApp();
       } else {
         const err = document.getElementById("pw-error");
         err.textContent = "Incorrect password — try again.";
@@ -773,6 +776,7 @@
     if (sessionStorage.getItem("gym_unlocked")==="1") {
       document.getElementById("lock-screen").style.display = "none";
       document.getElementById("app").style.display = "block";
+      initApp();
     }
   </script>
 
