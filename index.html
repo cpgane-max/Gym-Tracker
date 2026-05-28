@@ -31,7 +31,18 @@
     .lock-card button:hover { opacity: 0.85; }
     .lock-error { font-size: 12px; color: var(--danger); margin-top: 0.6rem; min-height: 16px; }
 
-    /* Layout */
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; }
+    .modal-box { background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 1.75rem 1.5rem; width: 100%; max-width: 360px; }
+    .modal-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.5; }
+    .modal-session { background: var(--surface2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; margin-bottom: 1.25rem; }
+    .modal-session strong { color: var(--accent); }
+    .modal-btn { width: 100%; text-align: left; background: var(--surface2); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--text); cursor: pointer; margin-bottom: 8px; transition: border-color 0.15s, background 0.15s; display: flex; align-items: center; gap: 10px; }
+    .modal-btn:hover { border-color: var(--accent-dark); background: var(--accent-dim); }
+    .modal-btn.danger:hover { border-color: var(--danger); background: var(--danger-dim); }
+    .modal-btn:last-child { margin-bottom: 0; color: var(--muted); }
+    .modal-btn .modal-num { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--surface); border: 0.5px solid var(--border2); border-radius: 4px; padding: 2px 7px; min-width: 22px; text-align: center; }
     .container { max-width: 780px; margin: 0 auto; }
     header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid var(--border); }
     .logo { display: flex; flex-direction: column; gap: 2px; }
@@ -674,6 +685,59 @@
       document.getElementById("stat-mins").textContent = sessions.reduce((a,s)=>a+s.duration,0);
       document.getElementById("stat-week").textContent = sessions.filter(s=>s.week===getCurrentWeek()).length;
     }
+    let pendingDeleteId = null;
+
+    function deleteSession(id) {
+      const session = sessions.find(s => s.id === id);
+      if (!session) return;
+      pendingDeleteId = id;
+      document.getElementById("modal-session-info").innerHTML =
+        `<strong>${session.activity}</strong> &nbsp;·&nbsp; ${session.date} &nbsp;·&nbsp; ${session.duration} min`;
+      document.getElementById("delete-modal").style.display = "flex";
+    }
+
+    async function confirmDelete(choice) {
+      document.getElementById("delete-modal").style.display = "none";
+      if (choice === 3 || !pendingDeleteId) { pendingDeleteId = null; return; }
+
+      const session = sessions.find(s => s.id === pendingDeleteId);
+      if (!session) { pendingDeleteId = null; return; }
+
+      // Option 1 or 2: remove from local
+      sessions = sessions.filter(s => s.id !== pendingDeleteId);
+      saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
+
+      if (choice === 2) {
+        // Also delete from Google Sheet
+        const status = document.getElementById("sync-status");
+        status.style.color = "var(--muted)";
+        status.textContent = "Deleting from Google Sheets…";
+        try {
+          const params = new URLSearchParams({
+            action: "deleteSession",
+            date: session.date,
+            activity: session.activity,
+            duration: session.duration
+          });
+          const resp = await fetch(SHEETS_URL + "?" + params.toString());
+          const data = await resp.json();
+          status.style.color = data.success ? "var(--accent)" : "var(--danger)";
+          status.textContent = data.success
+            ? "✓ Deleted from this page and Google Sheets"
+            : "⚠ Deleted locally — could not remove from Google Sheets";
+        } catch(e) {
+          status.style.color = "var(--danger)";
+          status.textContent = "⚠ Deleted locally — could not reach Google Sheets";
+        }
+        setTimeout(() => { status.textContent = ""; }, 5000);
+      }
+      pendingDeleteId = null;
+    }
+
+    // Close modal on overlay click
+    document.getElementById("delete-modal").addEventListener("click", function(e) {
+      if (e.target === this) confirmDelete(3);
+    });
 
     // Init
     const t = localToday();
@@ -691,6 +755,49 @@
 
   <script>
     const APP_PASSWORD = "gymtime"; // ← change password here
+    function checkPassword() {
+      const val = document.getElementById("pw-input").value;
+      if (val === APP_PASSWORD) {
+        sessionStorage.setItem("gym_unlocked","1");
+        document.getElementById("lock-screen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+      } else {
+        const err = document.getElementById("pw-error");
+        err.textContent = "Incorrect password — try again.";
+        document.getElementById("pw-input").value = "";
+        document.getElementById("pw-input").focus();
+        setTimeout(()=>{err.textContent="";},3000);
+      }
+    }
+    document.getElementById("pw-input").addEventListener("keydown", e => { if (e.key==="Enter") checkPassword(); });
+    if (sessionStorage.getItem("gym_unlocked")==="1") {
+      document.getElementById("lock-screen").style.display = "none";
+      document.getElementById("app").style.display = "block";
+    }
+  </script>
+
+  <!-- Delete modal -->
+  <div class="modal-overlay" id="delete-modal" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">Where would you like to delete this entry?</div>
+      <div class="modal-session" id="modal-session-info"></div>
+      <button class="modal-btn" onclick="confirmDelete(1)">
+        <span class="modal-num">1</span>
+        Just this page
+      </button>
+      <button class="modal-btn danger" onclick="confirmDelete(2)">
+        <span class="modal-num">2</span>
+        This page and the Master Spreadsheet
+      </button>
+      <button class="modal-btn" onclick="confirmDelete(3)">
+        <span class="modal-num">3</span>
+        Cancel — do nothing
+      </button>
+    </div>
+  </div>
+
+</body>
+</html>
     function checkPassword() {
       const val = document.getElementById("pw-input").value;
       if (val === APP_PASSWORD) {
