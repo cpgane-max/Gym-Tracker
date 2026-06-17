@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sherrol's Workout Tracker</title>
-  <!-- BUILD: 2026-06-17 09:00 AEST -->
+  <!-- BUILD: 2026-06-17 11:30 AEST -->
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -142,7 +142,7 @@
       <div class="logo">
         <span class="logo-eyebrow">Training log</span>
         <h1>Sherrol's Workout Tracker</h1>
-        <div class="build-stamp">Build: 2026-06-17 09:00 AEST</div>
+        <div class="build-stamp">Build: 2026-06-17 11:30 AEST</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
         <div class="sheets-pill"><span class="dot"></span>Syncing to Google Sheets</div>
@@ -287,11 +287,11 @@
       <table>
         <thead>
           <tr>
-            <th style="width:52px">Week</th>
-            <th style="width:90px">Date</th>
+            <th style="width:72px">Week</th>
+            <th style="width:82px">Date</th>
             <th style="width:120px">Activity</th>
             <th style="width:72px">Duration</th>
-            <th style="width:64px">At Gym</th>
+            <th style="width:60px">At Gym</th>
             <th>Comments</th>
             <th style="width:36px"></th>
           </tr>
@@ -700,6 +700,13 @@
       if (e.target === this) confirmDelete(3);
     });
 
+    function shortDate(dateStr) {
+      if (!dateStr) return "";
+      const parts = dateStr.split("-");
+      if (parts.length === 3) return parts[2] + "/" + parts[1] + "/" + parts[0].slice(2);
+      return dateStr;
+    }
+
     function renderTable() {
       const tbody = document.getElementById("session-tbody");
       if (!sessions.length) {
@@ -708,8 +715,8 @@
       }
       tbody.innerHTML = sessions.map(s => `
         <tr>
-          <td><span class="week-badge">W${s.week}</span></td>
-          <td class="muted-cell">${s.date}</td>
+          <td style="white-space:nowrap"><span class="week-badge">W${s.week}</span></td>
+          <td class="muted-cell" style="white-space:nowrap">${shortDate(s.date)}</td>
           <td style="font-weight:500">${s.activity}</td>
           <td class="muted-cell">${s.duration} min</td>
           <td>${s.atGym ? '<span class="gym-badge">Yes</span>' : '<span style="color:var(--muted);font-size:12px;">No</span>'}</td>
