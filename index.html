@@ -254,6 +254,7 @@
                 <option value="Weights">Weights</option>
                 <option value="Spin">Spin</option>
                 <option value="Spinlates">Spinlates</option>
+                <option value="Cycle">Cycle</option>
                 <option value="Walk">Walk</option>
                 <option value="other">Other (type below)…</option>
               </select>
@@ -367,7 +368,7 @@
       const a = (activity || "").trim().toLowerCase();
       if (a === "pt") return "pt";
       if (a === "weights") return "weights";
-      if (a === "spin" || a === "spinlates") return "cycle";
+      if (a === "spin" || a === "spinlates" || a === "cycle") return "cycle";
       return "cardio";
     }
 
