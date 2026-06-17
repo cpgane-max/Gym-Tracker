@@ -1,804 +1,127 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sherrol's Gym Tracker</title>
-  <!-- BUILD: 2026-05-27 10:30 AEST -->
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0e0f0e; --surface: #161717; --surface2: #1e1f1e;
-      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
-      --text: #f0f0ee; --muted: #888986;
-      --accent: #c8f06a; --accent-dim: rgba(200,240,106,0.12); --accent-dark: #8aaa3a;
-      --danger: #f06a6a; --danger-dim: rgba(240,106,106,0.1);
-      --info: #6ab4f0; --info-dim: rgba(106,180,240,0.12);
-      --radius: 10px; --radius-lg: 16px;
+// Sherrol's Workout Tracker — Google Apps Script
+// Paste this into Extensions > Apps Script in your Google Sheet
+
+const SHEET_NAME = "Sessions";
+
+function normaliseDate(val) {
+  if (!val) return "";
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, "0");
+    const d = String(val.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+  const s = val.toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const parts = s.split("/");
+    return parts[2] + "-" + parts[1].padStart(2,"0") + "-" + parts[0].padStart(2,"0");
+  }
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+    const parts = s.split("-");
+    return parts[2] + "-" + parts[1].padStart(2,"0") + "-" + parts[0].padStart(2,"0");
+  }
+  return s;
+}
+
+function ensureHeaders(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["Week Number", "Date", "Activity", "Duration (minutes)", "At Gym", "Comments"]);
+    sheet.getRange(1, 1, 1, 6).setFontWeight("bold");
+  }
+}
+
+function doPost(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    ensureHeaders(sheet);
+    let week, date, activity, duration, atGym, comments;
+    if (e.postData && e.postData.contents) {
+      const data = JSON.parse(e.postData.contents);
+      week = data.week; date = data.date; activity = data.activity;
+      duration = data.duration; atGym = data.atGym; comments = data.comments;
+    } else {
+      week = e.parameter.week; date = e.parameter.date; activity = e.parameter.activity;
+      duration = e.parameter.duration; atGym = e.parameter.atGym; comments = e.parameter.comments;
     }
-    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem 4rem; }
+    sheet.appendRow([week, date, activity, duration, atGym || "No", comments]);
+    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
 
-    /* Lock screen */
-    #lock-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 999; }
-    .lock-card { background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 2.5rem 2rem; width: 100%; max-width: 340px; text-align: center; }
-    .lock-icon { font-size: 32px; margin-bottom: 1rem; }
-    .lock-card h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
-    .lock-card p { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
-    .lock-card input { width: 100%; background: var(--surface2); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 15px; font-family: 'DM Mono', monospace; color: var(--text); text-align: center; letter-spacing: 0.1em; outline: none; margin-bottom: 0.75rem; }
-    .lock-card input:focus { border-color: var(--accent-dark); }
-    .lock-card button { width: 100%; background: var(--accent); color: #0e0f0e; border: none; border-radius: var(--radius); padding: 0.75rem; font-size: 13px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; cursor: pointer; transition: opacity 0.15s; }
-    .lock-card button:hover { opacity: 0.85; }
-    .lock-error { font-size: 12px; color: var(--danger); margin-top: 0.6rem; min-height: 16px; }
+function doGet(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
 
-    /* Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; }
-    .modal-box { background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 1.75rem 1.5rem; width: 100%; max-width: 360px; }
-    .modal-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-    .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.5; }
-    .modal-session { background: var(--surface2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; margin-bottom: 1.25rem; }
-    .modal-session strong { color: var(--accent); }
-    .modal-btn { width: 100%; text-align: left; background: var(--surface2); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--text); cursor: pointer; margin-bottom: 8px; transition: border-color 0.15s, background 0.15s; display: flex; align-items: center; gap: 10px; }
-    .modal-btn:hover { border-color: var(--accent-dark); background: var(--accent-dim); }
-    .modal-btn.danger:hover { border-color: var(--danger); background: var(--danger-dim); }
-    .modal-btn:last-child { margin-bottom: 0; color: var(--muted); }
-    .modal-btn .modal-num { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--surface); border: 0.5px solid var(--border2); border-radius: 4px; padding: 2px 7px; min-width: 22px; text-align: center; }
-    .container { max-width: 780px; margin: 0 auto; }
-    header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid var(--border); }
-    .logo { display: flex; flex-direction: column; gap: 2px; }
-    .logo-eyebrow { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); }
-    .logo h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
-    .build-stamp { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); opacity: 0.5; margin-top: 4px; }
-    .sheets-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: 'DM Mono', monospace; padding: 5px 12px; border-radius: 99px; border: 0.5px solid var(--accent-dark); background: var(--accent-dim); color: var(--accent); }
-    .sheets-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-    /* Stats */
-    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.25rem; }
-    .stat { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
-    .stat-label { font-size: 11px; font-family: 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-    .stat-val { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; color: var(--text); line-height: 1; }
-
-    /* Summary panel */
-    .summary-panel { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 1.5rem; overflow: hidden; }
-    .summary-toggle { width: 100%; background: none; border: none; padding: 0.9rem 1.25rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
-    .summary-toggle:hover { background: var(--surface2); }
-    .summary-toggle .chevron { transition: transform 0.2s; font-size: 10px; color: var(--muted); }
-    .summary-toggle.open .chevron { transform: rotate(180deg); }
-    .summary-body { display: none; padding: 0 1.25rem 1.25rem; border-top: 0.5px solid var(--border); }
-    .summary-body.open { display: block; }
-    .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 1rem; }
-    .summary-card { background: var(--surface2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; }
-    .summary-card-label { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--muted); margin-bottom: 4px; }
-    .summary-card-val { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--accent); }
-    .summary-card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-    /* Calendar */
-    .calendar-wrap { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 1.5rem; overflow: hidden; }
-    .cal-title { font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
-    .cal-nav { background: none; border: 0.5px solid var(--border2); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 3px 10px; font-size: 13px; }
-    .cal-nav:hover { color: var(--text); border-color: var(--accent-dark); }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0.75rem; gap: 2px; }
-    .cal-dow { text-align: center; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 4px 0 6px; }
-    .cal-day { position: relative; text-align: center; padding: 6px 2px; border-radius: 6px; font-size: 12px; cursor: default; min-height: 38px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
-    .cal-day.has-workout { cursor: pointer; }
-    .cal-day.has-workout:hover { background: var(--surface2); }
-    .cal-day.today { background: var(--surface2); color: var(--accent); font-weight: 600; }
-    .cal-day.other-month { color: rgba(255,255,255,0.2); }
-    .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); position: absolute; top: 4px; left: 50%; transform: translateX(-50%); }
-    /* Popup — fixed position to avoid clipping */
-    .cal-popup { position: fixed; background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; z-index: 100; min-width: 180px; max-width: 260px; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
-    .cal-popup-title { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); margin-bottom: 6px; letter-spacing: 0.05em; }
-    .cal-popup-item { font-size: 12px; color: var(--text); padding: 4px 0; border-bottom: 0.5px solid var(--border); line-height: 1.4; }
-    .cal-popup-item:last-child { border-bottom: none; }
-
-    /* Form */
-    .chat-wrap { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem; }
-    .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
-    .section-label { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-    .table-wrap { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th { text-align: left; padding: 10px 14px; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 0.5px solid var(--border); background: var(--surface2); }
-    td { padding: 11px 14px; font-size: 13px; border-bottom: 0.5px solid var(--border); color: var(--text); vertical-align: middle; word-break: break-word; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: var(--surface2); }
-    .week-badge { display: inline-block; font-family: 'DM Mono', monospace; font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--accent-dim); color: var(--accent); border: 0.5px solid var(--accent-dark); }
-    .muted-cell { color: var(--muted); }
-    .del-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 4px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
-    .del-btn:hover { color: var(--danger); background: var(--danger-dim); }
-    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 13px; }
-    .empty-state span { display: block; font-size: 28px; margin-bottom: 8px; }
-    select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888986' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
-
-    @media (max-width: 520px) {
-      .stats-row { gap: 6px; } .stat-val { font-size: 22px; }
-      header { flex-direction: column; align-items: flex-start; gap: 12px; }
-      th:nth-child(5), td:nth-child(5) { display: none; }
-      .summary-grid { grid-template-columns: 1fr; }
+  // Write session via GET params
+  if (e.parameter.week && e.parameter.activity) {
+    try {
+      ensureHeaders(sheet);
+      sheet.appendRow([
+        e.parameter.week,
+        e.parameter.date,
+        e.parameter.activity,
+        e.parameter.duration,
+        e.parameter.atGym || "No",
+        e.parameter.comments
+      ]);
+      return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message })).setMimeType(ContentService.MimeType.JSON);
     }
-  </style>
-</head>
-<body>
+  }
 
-  <div id="lock-screen">
-    <div class="lock-card">
-      <div class="lock-icon">🏋️</div>
-      <h2>Sherrol's Gym Tracker</h2>
-      <p>Enter the password to continue</p>
-      <input type="password" id="pw-input" placeholder="Password" />
-      <button onclick="checkPassword()">Unlock →</button>
-      <div class="lock-error" id="pw-error"></div>
-    </div>
-  </div>
-
-  <div class="container" id="app" style="display:none">
-
-    <header>
-      <div class="logo">
-        <span class="logo-eyebrow">Training log</span>
-        <h1>Sherrol's Gym Tracker</h1>
-        <div class="build-stamp">Build: 2026-05-27 10:30 AEST</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-        <div class="sheets-pill"><span class="dot"></span>Syncing to Google Sheets</div>
-        <a href="https://docs.google.com/spreadsheets/d/13qSWvcTERnvuQZswVTZAkos5N8KSZgEPh838_q9tceQ/edit?gid=0#gid=0" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:var(--muted);text-decoration:none;border-bottom:0.5px solid var(--border2);padding-bottom:1px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">View Google Sheet →</a>
-      </div>
-    </header>
-
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat"><div class="stat-label">Sessions</div><div class="stat-val" id="stat-count">0</div></div>
-      <div class="stat"><div class="stat-label">Minutes</div><div class="stat-val" id="stat-mins">0</div></div>
-      <div class="stat"><div class="stat-label">This week</div><div class="stat-val" id="stat-week">0</div></div>
-    </div>
-
-    <!-- Summary Panel -->
-    <div class="summary-panel">
-      <button class="summary-toggle" id="summary-toggle" onclick="toggleSummary()">
-        <span>All Sessions Completed since 22nd Oct 2025</span>
-        <span class="chevron">▼</span>
-      </button>
-      <div class="summary-body" id="summary-body">
-        <div style="margin-top:1rem;display:flex;flex-direction:column;gap:10px;">
-          <div class="summary-card" style="text-align:center;">
-            <div class="summary-card-label">Total Sessions</div>
-            <div class="summary-card-val" id="sum-total">0</div>
-            <div class="summary-card-sub" id="sum-mins-total">0 minutes</div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="summary-card" style="text-align:center;">
-              <div class="summary-card-label">PT Sessions</div>
-              <div class="summary-card-val" id="sum-pt">0</div>
-              <div class="summary-card-sub" id="sum-pt-mins">0 minutes</div>
-            </div>
-            <div class="summary-card" style="text-align:center;">
-              <div class="summary-card-label">Cycle Sessions</div>
-              <div class="summary-card-val" id="sum-cycle">0</div>
-              <div class="summary-card-sub" id="sum-cycle-mins">0 minutes</div>
-            </div>
-            <div class="summary-card" style="text-align:center;">
-              <div class="summary-card-label">Cardio Workouts</div>
-              <div class="summary-card-val" id="sum-cardio">0</div>
-              <div class="summary-card-sub" id="sum-cardio-mins">0 minutes</div>
-            </div>
-            <div class="summary-card" style="text-align:center;">
-              <div class="summary-card-label">Weights Sessions</div>
-              <div class="summary-card-val" id="sum-weights">0</div>
-              <div class="summary-card-sub" id="sum-weights-mins">0 minutes</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Calendar -->
-    <div class="calendar-wrap">
-      <button class="summary-toggle" id="cal-toggle" onclick="toggleCalendar()">
-        <span>Workout Calendar</span>
-        <span class="chevron">▼</span>
-      </button>
-      <div id="cal-body" style="display:none;">
-        <div style="border-top:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;">
-          <button class="cal-nav" onclick="calPrev()">◀</button>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span class="cal-title" id="cal-title"></span>
-            <button onclick="calGoToday()" style="background:var(--accent-dim);border:0.5px solid var(--accent-dark);border-radius:6px;color:var(--accent);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;padding:4px 10px;cursor:pointer;">TODAY</button>
-          </div>
-          <button class="cal-nav" onclick="calNext()">▶</button>
-        </div>
-        <div class="cal-grid">
-          <div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
-          <div class="cal-dow">Sat</div><div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div>
-        </div>
-        <div class="cal-grid" id="cal-days"></div>
-        <div id="cal-status" style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding:6px 0 10px;letter-spacing:0.05em;"></div>
-      </div>
-    </div>
-
-    <!-- Log Form -->
-    <div class="chat-wrap">
-      <div style="padding:1.25rem;display:flex;flex-direction:column;gap:12px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div>
-            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Date</label>
-            <input type="date" id="f-date" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;color-scheme:dark;" />
-          </div>
-          <div>
-            <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Week number</label>
-            <input type="number" id="f-week" min="1" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
-          </div>
-        </div>
-        <div style="border-top:0.5px solid var(--border);padding-top:12px;">
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Activities</label>
-          <div id="activity-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
-          <div style="display:grid;grid-template-columns:1fr 100px 32px;gap:8px;align-items:center;">
-            <div style="position:relative;">
-              <select id="f-activity-select" onchange="onActivitySelect()" style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 2rem 0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;cursor:pointer;">
-                <option value="">— Select activity —</option>
-                <option value="PT">PT</option>
-                <option value="Weights">Weights</option>
-                <option value="Spin">Spin</option>
-                <option value="Spinlates">Spinlates</option>
-                <option value="other">Other (type below)…</option>
-              </select>
-            </div>
-            <input type="number" id="f-duration" placeholder="Min" min="1" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
-            <button onclick="addActivity()" title="Add activity" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--accent);font-size:20px;cursor:pointer;height:38px;width:32px;display:flex;align-items:center;justify-content:center;padding:0;">+</button>
-          </div>
-          <div id="f-activity-custom-wrap" style="display:none;margin-top:8px;">
-            <input type="text" id="f-activity-custom" placeholder="Type your activity..." style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.6rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
-          </div>
-        </div>
-        <div>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Comments (applies to all activities)</label>
-          <input type="text" id="f-comments" placeholder="Any notes about the session..." style="width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:0.65rem 0.9rem;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;" />
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <button id="send-btn" onclick="logSession()" style="background:var(--accent);color:#0e0f0e;border:none;border-radius:var(--radius);padding:0.7rem 1.5rem;font-size:13px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;">LOG SESSION →</button>
-          <span id="log-status" style="font-size:13px;"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- History -->
-    <div class="history-header">
-      <span class="section-label">Session history</span>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <button onclick="syncFromSheet()" style="background:none;border:0.5px solid var(--accent-dark);color:var(--accent);border-radius:var(--radius);padding:5px 14px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;opacity:0.8;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'" id="sync-btn">↓ SYNC FROM SHEET</button>
-        <button onclick="clearLog()" style="background:none;border:0.5px solid var(--danger);color:var(--danger);border-radius:var(--radius);padding:5px 14px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.05em;cursor:pointer;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">CLEAR LOG</button>
-      </div>
-    </div>
-    <div id="sync-status" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px;min-height:16px;"></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:56px">Week</th><th style="width:96px">Date</th>
-            <th style="width:130px">Activity</th><th style="width:80px">Duration</th>
-            <th>Comments</th><th style="width:36px"></th>
-          </tr>
-        </thead>
-        <tbody id="session-tbody"></tbody>
-      </table>
-    </div>
-
-  </div>
-
-  <script>
-    const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwniwZzPNkyrN06U-t4O11tXlomuY2WPgxlfmypAV1qaGsR3pitDCNBuCzwdo1Xjc1j/exec";
-    const STORAGE_KEY = "gym_sessions_v1";
-    const WEEK1_START = new Date("2025-10-22T00:00:00");
-
-    let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    let calYear, calMonth, openPopup = null;
-
-    function saveSessions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions)); }
-
-    // --- Local date helpers (timezone-safe) ---
-    function localToday() {
-      const d = new Date();
-      return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-    }
-
-    function getWeekNumber(dateStr) {
-      const d = new Date(dateStr + "T00:00:00");
-      const day = d.getDay();
-      const daysToWed = (day >= 3) ? day - 3 : day + 4;
-      const weekStart = new Date(d);
-      weekStart.setDate(d.getDate() - daysToWed);
-      weekStart.setHours(0,0,0,0);
-      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-      return Math.max(1, Math.floor((weekStart - WEEK1_START) / msPerWeek) + 1);
-    }
-
-    function getCurrentWeek() { return getWeekNumber(localToday()); }
-
-    function normaliseDateStr(val) {
-      if (!val) return "";
-      const s = val.toString().trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-        const [d, m, y] = s.split("/");
-        return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
-      }
-      if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
-        const [d, m, y] = s.split("-");
-        return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
-      }
-      return s;
-    }
-
-    // --- Category logic ---
-    function categorise(activity) {
-      const a = (activity || "").trim().toLowerCase();
-      if (a === "pt") return "pt";
-      if (a === "weights") return "weights";
-      if (a === "spin" || a === "spinlates") return "cycle";
-      return "cardio"; // everything else
-    }
-
-    // --- Sync FROM sheet (current week only) ---
-    async function syncFromSheet() {
-      const btn = document.getElementById("sync-btn");
-      const status = document.getElementById("sync-status");
-      btn.disabled = true;
-      status.style.color = "var(--muted)";
-      status.textContent = "Fetching this week from Google Sheets…";
-      try {
-        const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
-        const data = await resp.json();
-        if (data.success && data.sessions.length) {
-          const thisWeek = getCurrentWeek();
-          const weekSessions = data.sessions
-            .filter(s => parseInt(s.week) === thisWeek)
-            .map((s, i) => ({
-              id: Date.now() + i,
-              date: normaliseDateStr(s.date),
-              week: parseInt(s.week) || getWeekNumber(normaliseDateStr(s.date)),
-              activity: s.activity,
-              duration: parseInt(s.duration) || 0,
-              comments: s.comments || "—"
-            }));
-
-          if (!weekSessions.length) {
-            status.style.color = "var(--muted)";
-            status.textContent = `No sessions found for week ${thisWeek}.`;
-            btn.disabled = false;
-            setTimeout(() => { status.textContent = ""; }, 4000);
-            return;
-          }
-
-          // Merge: keep existing local sessions not in this week, replace this week with sheet data
-          sessions = [
-            ...weekSessions,
-            ...sessions.filter(s => s.week !== thisWeek)
-          ];
-          sessions.sort((a, b) => b.date.localeCompare(a.date));
-          saveSessions();
-          renderTable();
-          updateStats();
-          sheetWorkoutMap = null;
-          status.style.color = "var(--accent)";
-          status.textContent = `✓ Synced ${weekSessions.length} session${weekSessions.length!==1?"s":""} for week ${thisWeek}`;
-        } else {
-          status.style.color = "var(--danger)";
-          status.textContent = "No data returned from sheet.";
+  // Delete a session row
+  if (e.parameter.action === "deleteSession") {
+    try {
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) return ContentService.createTextOutput(JSON.stringify({ success: false, error: "No data" })).setMimeType(ContentService.MimeType.JSON);
+      const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      let deletedRow = -1;
+      for (let i = 0; i < data.length; i++) {
+        const rowDate = normaliseDate(data[i][1]);
+        const rowActivity = (data[i][2] || "").toString().trim().toLowerCase();
+        const rowDuration = parseInt(data[i][3]) || 0;
+        if (rowDate === e.parameter.date &&
+            rowActivity === (e.parameter.activity || "").trim().toLowerCase() &&
+            rowDuration === parseInt(e.parameter.duration)) {
+          deletedRow = i + 2;
+          break;
         }
-      } catch(e) {
-        status.style.color = "var(--danger)";
-        status.textContent = "⚠ Could not reach Google Sheets.";
       }
-      btn.disabled = false;
-      setTimeout(() => { status.textContent = ""; }, 5000);
-    }
-
-    // --- Sync TO sheet ---
-    async function syncToSheets(session) {
-      try {
-        const params = new URLSearchParams({ week: session.week, date: session.date, activity: session.activity, duration: session.duration, comments: session.comments });
-        await fetch(SHEETS_URL + "?" + params.toString(), { method: "GET", mode: "no-cors" });
-        return true;
-      } catch(e) { return false; }
-    }
-
-    // --- Summary ---
-    function toggleSummary() {
-      const toggle = document.getElementById("summary-toggle");
-      const body = document.getElementById("summary-body");
-      toggle.classList.toggle("open");
-      body.classList.toggle("open");
-      if (body.classList.contains("open")) updateSummary();
-    }
-
-    async function updateSummary() {
-      ["sum-total","sum-pt","sum-cardio","sum-weights","sum-cycle"].forEach(id => document.getElementById(id).textContent = "…");
-      ["sum-mins-total","sum-pt-mins","sum-cardio-mins","sum-weights-mins","sum-cycle-mins"].forEach(id => document.getElementById(id).textContent = "loading…");
-
-      let allSessions = [];
-      try {
-        const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
-        const data = await resp.json();
-        if (data.success) allSessions = data.sessions;
-        else throw new Error();
-      } catch(e) {
-        allSessions = sessions;
-        document.getElementById("sum-mins-total").textContent = "⚠ Showing local data";
-      }
-
-      const totals = { pt:{count:0,mins:0}, cardio:{count:0,mins:0}, weights:{count:0,mins:0}, cycle:{count:0,mins:0} };
-      let totalMins = 0;
-      allSessions.forEach(s => {
-        const dur = parseInt(s.duration) || 0;
-        totalMins += dur;
-        const cat = categorise(s.activity || "");
-        totals[cat].count++; totals[cat].mins += dur;
-      });
-
-      document.getElementById("sum-total").textContent = allSessions.length;
-      document.getElementById("sum-mins-total").textContent = totalMins + " minutes";
-      document.getElementById("sum-pt").textContent = totals.pt.count;
-      document.getElementById("sum-pt-mins").textContent = totals.pt.mins + " minutes";
-      document.getElementById("sum-cardio").textContent = totals.cardio.count;
-      document.getElementById("sum-cardio-mins").textContent = totals.cardio.mins + " minutes";
-      document.getElementById("sum-weights").textContent = totals.weights.count;
-      document.getElementById("sum-weights-mins").textContent = totals.weights.mins + " minutes";
-      document.getElementById("sum-cycle").textContent = totals.cycle.count;
-      document.getElementById("sum-cycle-mins").textContent = totals.cycle.mins + " minutes";
-    }
-
-    // --- Calendar ---
-    let sheetWorkoutMap = null;
-
-    function toggleCalendar() {
-      const toggle = document.getElementById("cal-toggle");
-      const body = document.getElementById("cal-body");
-      const isOpen = body.style.display !== "none";
-      body.style.display = isOpen ? "none" : "block";
-      toggle.classList.toggle("open", !isOpen);
-      if (!isOpen) { sheetWorkoutMap = null; loadCalendarData(); }
-    }
-
-    async function loadCalendarData() {
-      document.getElementById("cal-days").innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:1.5rem;color:var(--muted);font-size:13px;">Loading…</div>`;
-      document.getElementById("cal-status").textContent = "";
-      document.getElementById("cal-status").style.color = "var(--muted)";
-      try {
-        const resp = await fetch(SHEETS_URL + "?action=getSessions&t=" + Date.now());
-        const data = await resp.json();
-        sheetWorkoutMap = {};
-        if (data.success) {
-          data.sessions.forEach(s => {
-            const dateStr = normaliseDateStr((s.date || "").toString().trim());
-            if (!sheetWorkoutMap[dateStr]) sheetWorkoutMap[dateStr] = [];
-            sheetWorkoutMap[dateStr].push(s);
-          });
-          const total = data.sessions.length;
-          const days = Object.keys(sheetWorkoutMap).length;
-          document.getElementById("cal-status").textContent = `${total} session${total!==1?"s":""} across ${days} day${days!==1?"s":""} — loaded from Google Sheets`;
-        } else { throw new Error(); }
-      } catch(e) {
-        sheetWorkoutMap = {};
-        sessions.forEach(s => {
-          const d = normaliseDateStr(s.date);
-          if (!sheetWorkoutMap[d]) sheetWorkoutMap[d] = [];
-          sheetWorkoutMap[d].push(s);
-        });
-        document.getElementById("cal-status").style.color = "var(--danger)";
-        document.getElementById("cal-status").textContent = "⚠ Using local data only";
-      }
-      renderCalendar();
-    }
-
-    function getWorkoutsByDate() {
-      if (sheetWorkoutMap) return sheetWorkoutMap;
-      const map = {};
-      sessions.forEach(s => { if (!map[s.date]) map[s.date] = []; map[s.date].push(s); });
-      return map;
-    }
-
-    function renderCalendar() {
-      const workouts = getWorkoutsByDate();
-      const todayStr = localToday();
-      const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-      document.getElementById("cal-title").textContent = monthNames[calMonth] + " " + calYear;
-
-      const firstDay = new Date(calYear, calMonth, 1);
-      const lastDay = new Date(calYear, calMonth + 1, 0);
-      const dowMap = {3:0,4:1,5:2,6:3,0:4,1:5,2:6};
-      const startPad = dowMap[firstDay.getDay()];
-
-      function lds(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
-
-      let html = "";
-      for (let i = 0; i < startPad; i++) {
-        const d = new Date(calYear, calMonth, 1-(startPad-i));
-        html += `<div class="cal-day other-month"><span>${d.getDate()}</span></div>`;
-      }
-      for (let d = 1; d <= lastDay.getDate(); d++) {
-        const dateObj = new Date(calYear, calMonth, d);
-        const dateStr = lds(dateObj);
-        const isToday = dateStr === todayStr;
-        const hasW = !!(workouts[dateStr] && workouts[dateStr].length);
-        const cls = ["cal-day", isToday?"today":"", hasW?"has-workout":""].filter(Boolean).join(" ");
-        const dot = hasW ? `<span class="cal-dot"></span>` : "";
-        const click = hasW ? `onclick="togglePopup(event,'${dateStr}')"` : "";
-        html += `<div class="${cls}" ${click}>${dot}<span>${d}</span></div>`;
-      }
-      const rem = (startPad + lastDay.getDate()) % 7;
-      if (rem > 0) for (let i = 1; i <= 7-rem; i++) html += `<div class="cal-day other-month"><span>${i}</span></div>`;
-      document.getElementById("cal-days").innerHTML = html;
-    }
-
-    function togglePopup(event, dateStr) {
-      if (openPopup) { openPopup.remove(); openPopup = null; }
-      const workouts = getWorkoutsByDate();
-      const list = workouts[dateStr] || [];
-      const popup = document.createElement("div");
-      popup.className = "cal-popup";
-      popup.innerHTML = `<div class="cal-popup-title">${dateStr}</div>` +
-        list.map(s => `<div class="cal-popup-item">${s.activity} — ${s.duration} min</div>`).join("");
-      document.body.appendChild(popup);
-      // Position near click, but keep within viewport
-      const x = Math.min(event.clientX + 8, window.innerWidth - 280);
-      const y = Math.min(event.clientY + 8, window.innerHeight - (list.length * 32 + 60));
-      popup.style.left = x + "px";
-      popup.style.top = y + "px";
-      openPopup = popup;
-      setTimeout(() => {
-        document.addEventListener("click", function closeP(e) {
-          if (!popup.contains(e.target)) { popup.remove(); openPopup = null; document.removeEventListener("click", closeP); }
-        });
-      }, 0);
-    }
-
-    function calPrev() { calMonth--; if (calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
-    function calNext() { calMonth++; if (calMonth>11){calMonth=0;calYear++;} renderCalendar(); }
-    function calGoToday() { const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); renderCalendar(); }
-
-    // --- Activity picklist ---
-    function onActivitySelect() {
-      const sel = document.getElementById("f-activity-select").value;
-      const customWrap = document.getElementById("f-activity-custom-wrap");
-      customWrap.style.display = sel === "other" ? "block" : "none";
-      if (sel === "other") document.getElementById("f-activity-custom").focus();
-    }
-
-    function getSelectedActivity() {
-      const sel = document.getElementById("f-activity-select").value;
-      if (sel === "other") return document.getElementById("f-activity-custom").value.trim();
-      return sel;
-    }
-
-    // --- Staging ---
-    let stagedActivities = [];
-
-    function addActivity() {
-      const activity = getSelectedActivity();
-      const duration = parseInt(document.getElementById("f-duration").value);
-      const status = document.getElementById("log-status");
-      if (!activity) { status.style.color="var(--danger)"; status.textContent="Please select or enter an activity."; return; }
-      if (!duration || duration < 1) { status.style.color="var(--danger)"; status.textContent="Please enter a valid duration."; return; }
-      stagedActivities.push({ activity, duration });
-      document.getElementById("f-activity-select").value = "";
-      document.getElementById("f-activity-custom").value = "";
-      document.getElementById("f-activity-custom-wrap").style.display = "none";
-      document.getElementById("f-duration").value = "";
-      status.textContent = "";
-      renderStaged();
-    }
-
-    function removeStaged(index) { stagedActivities.splice(index, 1); renderStaged(); }
-
-    function renderStaged() {
-      const list = document.getElementById("activity-list");
-      if (!stagedActivities.length) { list.innerHTML = ""; return; }
-      list.innerHTML = stagedActivities.map((a,i) => `
-        <div style="display:grid;grid-template-columns:1fr 100px 32px;gap:8px;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px 10px;">
-          <span style="font-size:13px;font-weight:500;">${a.activity}</span>
-          <span style="font-size:13px;color:var(--muted);">${a.duration} min</span>
-          <button onclick="removeStaged(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0;opacity:0.7;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">×</button>
-        </div>`).join("");
-    }
-
-    async function logSession() {
-      const dateVal = document.getElementById("f-date").value;
-      const weekVal = parseInt(document.getElementById("f-week").value);
-      const comments = document.getElementById("f-comments").value.trim();
-      const status = document.getElementById("log-status");
-
-      if (!dateVal) { status.style.color="var(--danger)"; status.textContent="Please select a date."; return; }
-      if (!weekVal || weekVal < 1) { status.style.color="var(--danger)"; status.textContent="Please enter a week number."; return; }
-
-      // Include any unsaved activity in the inputs
-      const pendingActivity = getSelectedActivity();
-      const pendingDuration = parseInt(document.getElementById("f-duration").value);
-      if (pendingActivity && pendingDuration > 0) {
-        stagedActivities.push({ activity: pendingActivity, duration: pendingDuration });
-        document.getElementById("f-activity-select").value = "";
-        document.getElementById("f-activity-custom").value = "";
-        document.getElementById("f-activity-custom-wrap").style.display = "none";
-        document.getElementById("f-duration").value = "";
-        renderStaged();
-      }
-
-      if (!stagedActivities.length) { status.style.color="var(--danger)"; status.textContent="Please add at least one activity."; return; }
-
-      const btn = document.getElementById("send-btn");
-      btn.disabled = true;
-      status.style.color = "var(--muted)";
-      status.textContent = `Syncing ${stagedActivities.length} activit${stagedActivities.length>1?"ies":"y"}...`;
-
-      let allSynced = true;
-      for (const a of stagedActivities) {
-        const session = { id: Date.now()+Math.random(), date: dateVal, week: weekVal, activity: a.activity, duration: a.duration, comments: comments||"—" };
-        sessions.unshift(session);
-        const synced = await syncToSheets(session);
-        if (!synced) allSynced = false;
-      }
-
-      saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
-
-      status.style.color = allSynced ? "var(--accent)" : "var(--danger)";
-      status.textContent = allSynced
-        ? `✓ ${stagedActivities.length} activit${stagedActivities.length>1?"ies":"y"} logged & synced!`
-        : "Saved locally — couldn't reach Google Sheets.";
-
-      stagedActivities = []; renderStaged();
-      document.getElementById("f-comments").value = "";
-      const t = localToday();
-      document.getElementById("f-date").value = t;
-      document.getElementById("f-week").value = getWeekNumber(t);
-      btn.disabled = false;
-      setTimeout(() => { status.textContent = ""; }, 4000);
-    }
-
-    function clearLog() {
-      if (!confirm("Are you sure? This will delete all of your workouts.")) return;
-      sessions = []; saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
-    }
-
-    function deleteSession(id) {
-      if (!confirm("Remove this session?")) return;
-      sessions = sessions.filter(s => s.id !== id);
-      saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
-    }
-
-    function renderTable() {
-      const tbody = document.getElementById("session-tbody");
-      if (!sessions.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span>🏋️</span>No sessions yet — log your first one above!</div></td></tr>`;
-        return;
-      }
-      tbody.innerHTML = sessions.map(s => `
-        <tr>
-          <td><span class="week-badge">W${s.week}</span></td>
-          <td class="muted-cell">${s.date}</td>
-          <td style="font-weight:500">${s.activity}</td>
-          <td class="muted-cell">${s.duration} min</td>
-          <td class="muted-cell">${s.comments}</td>
-          <td><button class="del-btn" onclick="deleteSession(${s.id})" title="Delete">×</button></td>
-        </tr>`).join("");
-    }
-
-    function updateStats() {
-      document.getElementById("stat-count").textContent = sessions.length;
-      document.getElementById("stat-mins").textContent = sessions.reduce((a,s)=>a+s.duration,0);
-      document.getElementById("stat-week").textContent = sessions.filter(s=>s.week===getCurrentWeek()).length;
-    }
-    let pendingDeleteId = null;
-
-    function deleteSession(id) {
-      const session = sessions.find(s => s.id === id);
-      if (!session) return;
-      pendingDeleteId = id;
-      document.getElementById("modal-session-info").innerHTML =
-        `<strong>${session.activity}</strong> &nbsp;·&nbsp; ${session.date} &nbsp;·&nbsp; ${session.duration} min`;
-      document.getElementById("delete-modal").style.display = "flex";
-    }
-
-    async function confirmDelete(choice) {
-      document.getElementById("delete-modal").style.display = "none";
-      if (choice === 3 || !pendingDeleteId) { pendingDeleteId = null; return; }
-
-      const session = sessions.find(s => s.id === pendingDeleteId);
-      if (!session) { pendingDeleteId = null; return; }
-
-      // Option 1 or 2: remove from local
-      sessions = sessions.filter(s => s.id !== pendingDeleteId);
-      saveSessions(); renderTable(); updateStats(); sheetWorkoutMap = null;
-
-      if (choice === 2) {
-        // Also delete from Google Sheet
-        const status = document.getElementById("sync-status");
-        status.style.color = "var(--muted)";
-        status.textContent = "Deleting from Google Sheets…";
-        try {
-          const params = new URLSearchParams({
-            action: "deleteSession",
-            date: session.date,
-            activity: session.activity,
-            duration: session.duration
-          });
-          const resp = await fetch(SHEETS_URL + "?" + params.toString());
-          const data = await resp.json();
-          status.style.color = data.success ? "var(--accent)" : "var(--danger)";
-          status.textContent = data.success
-            ? "✓ Deleted from this page and Google Sheets"
-            : "⚠ Deleted locally — could not remove from Google Sheets";
-        } catch(e) {
-          status.style.color = "var(--danger)";
-          status.textContent = "⚠ Deleted locally — could not reach Google Sheets";
-        }
-        setTimeout(() => { status.textContent = ""; }, 5000);
-      }
-      pendingDeleteId = null;
-    }
-
-    // Close modal on overlay click
-    document.getElementById("delete-modal").addEventListener("click", function(e) {
-      if (e.target === this) confirmDelete(3);
-    });
-
-    // Init — called after unlock
-    function initApp() {
-      const t = localToday();
-      document.getElementById("f-date").value = t;
-      document.getElementById("f-week").value = getWeekNumber(t);
-      const now = new Date();
-      calYear = now.getFullYear(); calMonth = now.getMonth();
-      renderTable(); updateStats();
-    }
-
-    document.getElementById("f-date").addEventListener("change", function() {
-      if (this.value) document.getElementById("f-week").value = getWeekNumber(this.value);
-    });
-    document.getElementById("f-duration").addEventListener("keydown", e => { if (e.key==="Enter") addActivity(); });
-  </script>
-
-  <script>
-    const APP_PASSWORD = "gymtime"; // ← change password here
-    function checkPassword() {
-      const val = document.getElementById("pw-input").value;
-      if (val === APP_PASSWORD) {
-        sessionStorage.setItem("gym_unlocked","1");
-        document.getElementById("lock-screen").style.display = "none";
-        document.getElementById("app").style.display = "block";
-        initApp();
+      if (deletedRow > 0) {
+        sheet.deleteRow(deletedRow);
+        return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
       } else {
-        const err = document.getElementById("pw-error");
-        err.textContent = "Incorrect password — try again.";
-        document.getElementById("pw-input").value = "";
-        document.getElementById("pw-input").focus();
-        setTimeout(()=>{err.textContent="";},3000);
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Row not found" })).setMimeType(ContentService.MimeType.JSON);
       }
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message })).setMimeType(ContentService.MimeType.JSON);
     }
-    document.getElementById("pw-input").addEventListener("keydown", e => { if (e.key==="Enter") checkPassword(); });
-    if (sessionStorage.getItem("gym_unlocked")==="1") {
-      document.getElementById("lock-screen").style.display = "none";
-      document.getElementById("app").style.display = "block";
-      initApp();
+  }
+
+  // Return all sessions as JSON
+  if (e.parameter.action === "getSessions") {
+    try {
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        return ContentService.createTextOutput(JSON.stringify({ success: true, sessions: [] })).setMimeType(ContentService.MimeType.JSON);
+      }
+      const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      const sessions = data.map(row => ({
+        week: row[0],
+        date: normaliseDate(row[1]),
+        activity: row[2],
+        duration: parseInt(row[3]) || 0,
+        atGym: row[4] ? row[4].toString() : "No",
+        comments: row[5]
+      }));
+      return ContentService.createTextOutput(JSON.stringify({ success: true, sessions })).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message })).setMimeType(ContentService.MimeType.JSON);
     }
-  </script>
+  }
 
-  <!-- Delete modal -->
-  <div class="modal-overlay" id="delete-modal" style="display:none;">
-    <div class="modal-box">
-      <div class="modal-title">Where would you like to delete this entry?</div>
-      <div class="modal-session" id="modal-session-info"></div>
-      <button class="modal-btn" onclick="confirmDelete(1)">
-        <span class="modal-num">1</span>
-        Just this page
-      </button>
-      <button class="modal-btn danger" onclick="confirmDelete(2)">
-        <span class="modal-num">2</span>
-        This page and the Master Spreadsheet
-      </button>
-      <button class="modal-btn" onclick="confirmDelete(3)">
-        <span class="modal-num">3</span>
-        Cancel — do nothing
-      </button>
-    </div>
-  </div>
-
-</body>
-</html>
+  return ContentService.createTextOutput(JSON.stringify({ status: "Workout Tracker is live!" })).setMimeType(ContentService.MimeType.JSON);
+}
