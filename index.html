@@ -694,7 +694,7 @@
           const resp = await fetch(SHEETS_URL + "?" + params.toString());
           const data = await resp.json();
           status.style.color = data.success ? "var(--accent)" : "var(--danger)";
-          status.textContent = data.success ? "✓ Deleted from this page and Google Sheets" : "⚠ Deleted locally — could not remove from Google Sheets";
+          status.textContent = data.success ? "✓ Deleted from this page and Google Sheets" : "⚠ Could not remove from Google Sheets: " + (data.error || "unknown error");
         } catch(e) {
           status.style.color = "var(--danger)";
           status.textContent = "⚠ Deleted locally — could not reach Google Sheets";
