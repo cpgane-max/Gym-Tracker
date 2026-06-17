@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sherrol's Workout Tracker</title>
-  <!-- BUILD: 2026-06-17 12:00 AEST -->
+  <!-- BUILD: 2026-06-17 12:30 AEST -->
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,7 +84,8 @@
     .cal-day.has-workout:hover { background: var(--surface2); }
     .cal-day.today { background: var(--surface2); color: var(--accent); font-weight: 600; }
     .cal-day.other-month { color: rgba(255,255,255,0.2); }
-    .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); position: absolute; top: 4px; left: 50%; transform: translateX(-50%); }
+    .cal-dot-row { display: flex; gap: 3px; position: absolute; top: 4px; left: 50%; transform: translateX(-50%); }
+    .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
     .cal-popup { position: fixed; background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; z-index: 100; min-width: 180px; max-width: 260px; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
     .cal-popup-title { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); margin-bottom: 6px; letter-spacing: 0.05em; }
     .cal-popup-item { font-size: 12px; color: var(--text); padding: 4px 0; border-bottom: 0.5px solid var(--border); line-height: 1.4; }
@@ -142,7 +143,7 @@
       <div class="logo">
         <span class="logo-eyebrow">Training log</span>
         <h1>Sherrol's Workout Tracker</h1>
-        <div class="build-stamp">Build: 2026-06-17 12:00 AEST</div>
+        <div class="build-stamp">Build: 2026-06-17 12:30 AEST</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
         <div class="sheets-pill"><span class="dot"></span>Syncing to Google Sheets</div>
@@ -253,6 +254,7 @@
                 <option value="Weights">Weights</option>
                 <option value="Spin">Spin</option>
                 <option value="Spinlates">Spinlates</option>
+                <option value="Walk">Walk</option>
                 <option value="other">Other (type below)…</option>
               </select>
             </div>
@@ -527,11 +529,12 @@
         const dateObj = new Date(calYear, calMonth, d);
         const dateStr = lds(dateObj);
         const isToday = dateStr === todayStr;
-        const hasW = !!(workouts[dateStr] && workouts[dateStr].length);
+        const count = workouts[dateStr] ? workouts[dateStr].length : 0;
+        const hasW = count > 0;
         const cls = ["cal-day", isToday?"today":"", hasW?"has-workout":""].filter(Boolean).join(" ");
-        const dot = hasW ? `<span class="cal-dot"></span>` : "";
+        const dots = hasW ? `<span class="cal-dot-row">${Array(Math.min(count,4)).fill('<span class="cal-dot"></span>').join("")}</span>` : "";
         const click = hasW ? `onclick="togglePopup(event,'${dateStr}')"` : "";
-        html += `<div class="${cls}" ${click}>${dot}<span>${d}</span></div>`;
+        html += `<div class="${cls}" ${click}>${dots}<span>${d}</span></div>`;
       }
       const rem = (startPad + lastDay.getDate()) % 7;
       if (rem > 0) for (let i=1; i<=7-rem; i++) html+=`<div class="cal-day other-month"><span>${i}</span></div>`;
