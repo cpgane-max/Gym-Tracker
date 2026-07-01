@@ -294,7 +294,7 @@
             <th style="width:82px">Date</th>
             <th style="width:120px">Activity</th>
             <th style="width:72px">Duration</th>
-            <th style="width:60px">At Gym</th>
+            <th style="width:50px;white-space:nowrap">At Gym</th>
             <th>Comments</th>
             <th style="width:36px"></th>
           </tr>
@@ -728,7 +728,7 @@
           <td class="muted-cell" style="white-space:nowrap">${shortDate(s.date)}</td>
           <td style="font-weight:500">${s.activity}</td>
           <td class="muted-cell">${s.duration} min</td>
-          <td>${s.atGym ? '<span class="gym-badge">Yes</span>' : '<span style="color:var(--muted);font-size:12px;">No</span>'}</td>
+          <td style="white-space:nowrap">${s.atGym ? '<span class="gym-badge">Y</span>' : '<span style="color:var(--muted);font-size:12px;font-family:\'DM Mono\',monospace;">N</span>'}</td>
           <td class="muted-cell">${s.comments}</td>
           <td><button class="del-btn" onclick="deleteSession(${s.id})" title="Delete">×</button></td>
         </tr>`).join("");
